@@ -8,8 +8,36 @@ const showProcessList = async client => {
 
 const killProcess = async (client, processId) => {
   return client.query(
-    `SELECT pg_terminate_backend(${processId}) FROM pg_stat_activity WHERE pid <> pg_backend_pid() AND datname = '${process.env.DB_NAME}';`
+    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = '${processId}' AND datname = '${process.env.DB_NAME}';`
   );
+};
+
+const sleep = delay =>
+  new Promise(resolve => {
+    setTimeout(() => {
+      resolve();
+    }, delay);
+  });
+
+const getFirstIdleConnectionPid = processesList => {
+  const proc = processesList.find(proc => proc.state === "idle");
+  return proc.pid;
+};
+
+const end = async client => {
+  const processesList = (await showProcessList(client)).rows.map(row => {
+    const epoch = new Date(row.backend_start).getTime();
+    return {
+      timeElapsed: Date.now() - epoch,
+      pid: row.pid,
+      state: row.state
+    };
+  });
+
+  if (processesList.length === 90) {
+    const pid = getFirstIdleConnectionPid(processesList);
+    await killProcess(client, pid);
+  }
 };
 
 const connect = async event => {
@@ -21,22 +49,26 @@ const connect = async event => {
     port: process.env.DB_PORT
   });
 
-  try {
-    await client.connect();
-    return "connection ok"
-  } catch (e) {
-    // if (e.message === "sorry, too many clients already") {
-    //   const response = await showProcessList(client);
-    //   return response.rows
-    // }
+  // We need to swallow these errors as they will terminate the process
+  client.on("error", err => {
+    if (
+      err.message === "terminating connection due to administrator command" ||
+      err.message === "Connection terminated unexpectedly"
+    ) {
+      console.info(err.message);
+    } else {
+      throw err;
+    }
+  });
 
-    return e.message
-  }
+  await client.connect();
+  await end(client);
+  return "connection ok";
 };
 
-for (let i = 0; i < 105; i++) {
-  connect()
-    .then(data => {
-      console.log(data)
-    })
-}
+(async function() {
+  for (let i = 0; i < 150; i++) {
+    console.log(i);
+    await connect();
+  }
+})();
