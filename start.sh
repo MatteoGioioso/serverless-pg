@@ -12,5 +12,5 @@ DB_NAME=${DB_NAME} \
 DB_PORT=${DB_PORT} \
 DB_HOST=${DB_HOST} \
 DB_USER=${DB_USER} \
-node lambda/index.js
+node index.js
 #sam local start-api --docker-network ${NETWORK_NAME}
