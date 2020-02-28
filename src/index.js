@@ -35,7 +35,7 @@ ServerlessClient.prototype._sleep = delay =>
 
 ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
   return this.query(
-    "SELECT pid,backend_start,state FROM pg_stat_activity WHERE datname='postgres' AND state='idle' ORDER BY backend_start DESC ;"
+    "SELECT pid,backend_start,state FROM pg_stat_activity WHERE datname='postgres' AND state='idle' ORDER BY backend_start DESC LIMIT 10;"
   );
 };
 
@@ -47,10 +47,15 @@ ServerlessClient.prototype._getProcessesCount = async function() {
   return result.rows[0].count;
 };
 
-ServerlessClient.prototype._killProcess = async function(processId) {
-  return this.query(
-    `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = '${processId}' AND datname = '${this._config.database}';`
-  );
+ServerlessClient.prototype._killProcesses = async function(processesList) {
+  let queries = [];
+  for (const proc of processesList.rows) {
+    queries.push(await this.query(
+      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = '${proc.pid}' AND datname = '${this._config.database}';`
+    ))
+  }
+
+  return await Promise.all(queries);
 };
 
 ServerlessClient.prototype.end = async function() {
@@ -58,7 +63,7 @@ ServerlessClient.prototype.end = async function() {
 
   if (processCount > 50) {
     const processesList = await this._getIdleProcessesListOrderByDate();
-    await this._killProcess(processesList.rows[0].pid);
+    await this._killProcesses(processesList);
   }
 };
 
