@@ -8,7 +8,7 @@ const connect = async i => {
     password: "",
     port: process.env.DB_PORT
   });
-  await client._sleep(Math.random()*10000);
+  await client._sleep(Math.random()*60*1000);
   console.log(i);
   await client.sconnect();
   await client.end();
@@ -17,8 +17,7 @@ const connect = async i => {
 
 (async function () {
   const promiseArray = [];
-  for (let i = 0; i < 200; i++) {
-    // console.log(i);
+  for (let i = 0; i < 1000; i++) {
     promiseArray.push(connect(i))
   }
 
