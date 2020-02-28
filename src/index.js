@@ -33,10 +33,18 @@ ServerlessClient.prototype._sleep = delay =>
     }, delay);
   });
 
-ServerlessClient.prototype._showProcessList = async function() {
+ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
   return this.query(
-    "SELECT pid,usename,backend_start,state,client_addr FROM pg_stat_activity WHERE datname='postgres' ;"
+    "SELECT pid,backend_start,state FROM pg_stat_activity WHERE datname='postgres' AND state='idle' ORDER BY backend_start DESC ;"
   );
+};
+
+ServerlessClient.prototype._getProcessesCount = async function() {
+  const result = await this.query(
+    "SELECT COUNT(pid) FROM pg_stat_activity WHERE datname='postgres' AND state='idle';"
+  );
+
+  return result.rows[0].count;
 };
 
 ServerlessClient.prototype._killProcess = async function(processId) {
@@ -45,26 +53,12 @@ ServerlessClient.prototype._killProcess = async function(processId) {
   );
 };
 
-ServerlessClient.prototype._getFirstIdleConnectionPid = function(
-  processesList
-) {
-  const proc = processesList.find(proc => proc.state === "idle");
-  return proc.pid;
-};
-
 ServerlessClient.prototype.end = async function() {
-  const processesList = (await this._showProcessList()).rows.map(row => {
-    const epoch = new Date(row.backend_start).getTime();
-    return {
-      timeElapsed: Date.now() - epoch,
-      pid: row.pid,
-      state: row.state
-    };
-  });
+  const processCount = await this._getProcessesCount();
 
-  if (processesList.length === 90) {
-    const pid = this._getFirstIdleConnectionPid(processesList);
-    await this._killProcess(pid);
+  if (processCount > 50) {
+    const processesList = await this._getIdleProcessesListOrderByDate();
+    await this._killProcess(processesList.rows[0].pid);
   }
 };
 
@@ -73,7 +67,7 @@ ServerlessClient.prototype.sconnect = async function() {
     await this.connect();
   } catch (e) {
     if (e.message === "sorry, too many clients already") {
-      const backoff = async (delay) => {
+      const backoff = async delay => {
         if (this._maxRetries > 0) {
           console.log(this._maxRetries, " trying to reconnect...");
           await this._sleep(delay);
@@ -84,7 +78,7 @@ ServerlessClient.prototype.sconnect = async function() {
 
       this._retries++;
       let delay = 1000 * this._retries;
-      await backoff(delay)
+      await backoff(delay);
     } else {
       throw e;
     }
