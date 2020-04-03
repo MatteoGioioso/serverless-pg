@@ -14,9 +14,8 @@ function ServerlessClient(config) {
       err.message === "terminating connection due to administrator command" ||
       err.message === "Connection terminated unexpectedly"
     ) {
-      // console.info(err.message);
+      // Swallow the error
     } else if (err.message === "sorry, too many clients already") {
-      // console.log("here ===========================")
       throw err;
     } else {
       throw err;
@@ -50,15 +49,17 @@ ServerlessClient.prototype._getProcessesCount = async function() {
 ServerlessClient.prototype._killProcesses = async function(processesList) {
   let queries = [];
   for (const proc of processesList.rows) {
-    queries.push(await this.query(
-      `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = '${proc.pid}' AND datname = '${this._config.database}';`
-    ))
+    queries.push(
+      await this.query(
+        `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid = '${proc.pid}' AND datname = '${this._config.database}';`
+      )
+    );
   }
 
   return await Promise.all(queries);
 };
 
-ServerlessClient.prototype.end = async function() {
+ServerlessClient.prototype.clean = async function() {
   const processCount = await this._getProcessesCount();
 
   if (processCount > 50) {
@@ -74,10 +75,11 @@ ServerlessClient.prototype.sconnect = async function() {
     if (e.message === "sorry, too many clients already") {
       const backoff = async delay => {
         if (this._maxRetries > 0) {
-          console.log(this._maxRetries, " trying to reconnect...");
+          console.log(this._maxRetries, " trying to reconnect... ");
           await this._sleep(delay);
           this._maxRetries--;
           await this.sconnect();
+          console.log("Re-connection successful!");
         }
       };
 
@@ -90,4 +92,4 @@ ServerlessClient.prototype.sconnect = async function() {
   }
 };
 
-module.exports = ServerlessClient;
+module.exports = { ServerlessClient };
