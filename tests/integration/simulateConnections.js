@@ -1,4 +1,4 @@
-const ServerlessClient = require("./src");
+const ServerlessClient = require("../../src");
 
 const _sleep = delay =>
   new Promise(resolve => {
@@ -8,30 +8,30 @@ const _sleep = delay =>
   });
 
 const execute = async i => {
-  await _sleep(Math.random()*60*250);
+  await _sleep(Math.random() * 5);
 
   (async () => {
     const client = new ServerlessClient({
       user: process.env.DB_USER,
       host: "localhost",
       database: process.env.DB_NAME,
-      password: "",
+      password: process.env.DB_PASSWORD,
       port: process.env.DB_PORT
     });
 
     await client.sconnect();
     const result = await client.query(`SELECT NOW()`);
     console.log(result.rows[0].now, i);
-    await client.end();
+    await client.clean();
     return "connection ok";
-  })()
+  })();
 };
 
-(async function () {
+(async function() {
   const promiseArray = [];
   for (let i = 0; i < 1000; i++) {
-    promiseArray.push(execute(i))
+    promiseArray.push(execute(i));
   }
 
-  await Promise.all(promiseArray)
+  await Promise.all(promiseArray);
 })();
