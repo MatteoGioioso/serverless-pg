@@ -1,6 +1,9 @@
 language: node_js
 node_js:
   - 9
+branches:
+  only:
+    - master
 jobs:
   include:
     # Define the release stage that runs semantic-release
