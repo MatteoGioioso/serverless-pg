@@ -19,7 +19,7 @@ docker network create ${NETWORK_NAME}
 docker run \
     --name ${POSTGRES_CONTAINER_NAME} \
     --network ${NETWORK_NAME} \
-    -e POSTGRES_USER=${DB_USER} \
+    -e POSTGRES_USER=${DB_USER} -e POSTGRES_PASSWORD=${DB_PASSWORD} \
     -p ${DB_PORT}:5432 postgres
 
 trap cleanup EXIT
