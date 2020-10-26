@@ -10,11 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "pg": "^7.18.1"
+    "pg": "^7.18.2"
   },
   "devDependencies": {
     "prettier": "^1.19.1",
-    "semantic-release": "^17.0.4"
+    "semantic-release": "^17.2.1"
   },
   "prettier": {
     "printWidth": 100
