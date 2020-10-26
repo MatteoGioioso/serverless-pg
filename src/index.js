@@ -1,38 +1,42 @@
+/**
+ * This module manages PostgreSQL connections in serverless applications.
+ * More detail regarding the PostgreSQL module can be found here:
+ * https://github.com/brianc/node-postgres
+ * @author Matteo Gioioso <matteo@hirvitek.com>
+ * @version 1.1.0
+ * @license MIT
+ */
+
 const { Client } = require("pg");
 
 function ServerlessClient(config) {
-  Client.call(this, config);
-
   this._config = config;
   this._maxRetries = config.maxRetries || 10;
+
+  // If this parameters is set to true it will query to get the maxConnections values,
+  // to maximize performance you should set the maxConnections yourself
+  this._automaticMaxConnections = config.automaticMaxConnections
+  // Cache expiration for getting the max connections value in milliseconds
+  this._maxConnsFreq = config.maxConnsFreq || 60000;
   this._maxConnections = config.maxConnections || 100;
+  this._maxConnectionsCache = {
+    total: this._maxConnections,
+    updated: Date.now()
+  }
+
+  // Activate debugging
+  this._debug = config.debug
 
   // The bigger the slower, but more impactful on the connections dropped
   this._maxRetrivedProcesses = config.maxRetrivedProcesses || 10;
 
-  // This number represent the percentage threshold at which the cleanup will be triggered.
-  // Ex: if you have 100 max connections and processesPercentageThreshold set at 60 (%),
-  // then it will start dropping connections if the total idle connections count is more than 60
-  this._processesPercentageThreshold = (config.processesPercentageThreshold || 50) / 100
+  // The percentage of total connections to use when connecting to your Postgres server.
+  // A value of 0.75 would use 75% of your total available connections.
+  // Past this threshold the connection killer will kick in.
+  this._connUtilization = config.connUtilization || 0.8
   this._retries = 1;
-
-  // pg throws an error if we terminate the connection, therefore we need to swallow these errors
-  // and throw the rest
-  this.on("error", err => {
-    if (
-      err.message === "terminating connection due to administrator command" ||
-      err.message === "Connection terminated unexpectedly"
-    ) {
-      // Swallow the error
-    } else if (err.message === "sorry, too many clients already") {
-      throw err;
-    } else {
-      throw err;
-    }
-  });
 }
 
-ServerlessClient.prototype = new Client();
 ServerlessClient.prototype.constructor = ServerlessClient;
 ServerlessClient.prototype._sleep = delay =>
   new Promise(resolve => {
@@ -41,8 +45,24 @@ ServerlessClient.prototype._sleep = delay =>
     }, delay);
   });
 
+ServerlessClient.prototype._setMaxConnections = async () => {
+  // If cache is expired
+  if (Date.now() - this._maxConnectionsCache.updated > this._maxConnsFreq) {
+    const results = await this._client.query(
+      `SHOW max_connections`
+    )
+
+    this._maxConnectionsCache = {
+      total: results.rows[0],
+      updated: Date.now()
+    }
+  }
+
+  this._maxConnections = this._maxConnectionsCache.total
+}
+
 ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
-  return this.query(
+  return this._client.query(
     `SELECT pid,backend_start,state 
         FROM pg_stat_activity 
         WHERE datname=$1 AND state='idle' 
@@ -53,7 +73,7 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
 };
 
 ServerlessClient.prototype._getProcessesCount = async function() {
-  const result = await this.query(
+  const result = await this._client.query(
     "SELECT COUNT(pid) FROM pg_stat_activity WHERE datname=$1 AND state='idle';",
     [this._config.database]
   );
@@ -70,30 +90,35 @@ ServerlessClient.prototype._killProcesses = async function(processesList) {
       AND datname = $2 AND state='idle';`
   const values = [pids, this._config.database]
 
-  return this.query(query, values)
+  return this._client.query(query, values)
 };
 
 ServerlessClient.prototype.clean = async function() {
   const processCount = await this._getProcessesCount();
 
-  if (processCount > this._maxConnections * this._processesPercentageThreshold) {
+  if (processCount > this._maxConnections * this._connUtilization) {
     const processesList = await this._getIdleProcessesListOrderByDate();
     await this._killProcesses(processesList);
+    this._logger("Killed processes...", processesList.rows.length)
   }
 };
 
 ServerlessClient.prototype.sconnect = async function() {
   try {
-    await this.connect();
+    await this._init()
+    await this._client.connect();
   } catch (e) {
     if (e.message === "sorry, too many clients already") {
+      // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
+      // therefore we need to throw the instance and recreate a new one
+      await this._init()
       const backoff = async delay => {
         if (this._maxRetries > 0) {
-          console.log(this._maxRetries, " trying to reconnect... ");
+          this._logger(this._maxRetries, " trying to reconnect... ")
           await this._sleep(delay);
           this._maxRetries--;
           await this.sconnect();
-          console.log("Re-connection successful!");
+          this._logger("Re-connection successful!")
         }
       };
 
@@ -105,5 +130,48 @@ ServerlessClient.prototype.sconnect = async function() {
     }
   }
 };
+
+ServerlessClient.prototype._init = async function(){
+  this._client = new Client(this._config)
+
+  if (this._automaticMaxConnections){
+    await this._setMaxConnections()
+  }
+
+  this._logger("Max connections: ", this._maxConnections)
+
+  // pg throws an error if we terminate the connection, therefore we need to swallow these errors
+  // and throw the rest
+  this._client.on("error", err => {
+    if (
+      err.message === "terminating connection due to administrator command" ||
+      err.message === "Connection terminated unexpectedly"
+    ) {
+      // Swallow the error
+    } else if (err.message === "sorry, too many clients already") {
+      throw err;
+    } else {
+      throw err;
+    }
+  });
+}
+
+ServerlessClient.prototype._logger = function(...args) {
+  if (this._debug){
+    console.log('\x1b[36m%s\x1b[0m', 'serverless-pg | ', ...args)
+  }
+}
+
+ServerlessClient.prototype.query = async function(...args){
+  return this._client.query(...args)
+}
+
+ServerlessClient.prototype.end = async function(){
+  return this._client.end()
+}
+
+ServerlessClient.prototype.on = function(...args){
+  return this._client.on(...args)
+}
 
 module.exports = { ServerlessClient };
