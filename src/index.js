@@ -1,6 +1,6 @@
 /**
  * This module manages PostgreSQL connections in serverless applications.
- * More detail regarding the PostgreSQL module can be found here:
+ * This module wrap node-postgres package, more detail regarding it can be found here:
  * https://github.com/brianc/node-postgres
  * @author Matteo Gioioso <matteo@hirvitek.com>
  * @version 1.1.0
@@ -11,29 +11,31 @@ const { Client } = require("pg");
 
 function ServerlessClient(config) {
   this._config = config;
-  this._maxRetries = config.maxRetries || 10;
+  this._maxRetries = config.maxRetries || 3;
 
   // If this parameters is set to true it will query to get the maxConnections values,
-  // to maximize performance you should set the maxConnections yourself
+  // to maximize performance you should set the maxConnections yourself.
+  // Is suggested to manually set the maxConnections and keep this setting to false.
   this._automaticMaxConnections = config.automaticMaxConnections
   // Cache expiration for getting the max connections value in milliseconds
-  this._maxConnsFreq = config.maxConnsFreq || 60000;
+  this._maxConnsFreqMs = config.maxConnsFreqMs || 60000;
   this._maxConnections = config.maxConnections || 100;
   this._maxConnectionsCache = {
     total: this._maxConnections,
     updated: Date.now()
   }
 
-  // Activate debugging
+  // Activate debugging logger
   this._debug = config.debug
 
-  // The bigger the slower, but more impactful on the connections dropped
-  this._maxRetrivedProcesses = config.maxRetrivedProcesses || 10;
+  // The bigger, the more idle connections will be possibly dropped
+  this._maxIdleConnections = config.maxIdleConnections || 10;
 
   // The percentage of total connections to use when connecting to your Postgres server.
   // A value of 0.75 would use 75% of your total available connections.
   // Past this threshold the connection killer will kick in.
   this._connUtilization = config.connUtilization || 0.8
+
   this._retries = 1;
 }
 
@@ -52,6 +54,8 @@ ServerlessClient.prototype._setMaxConnections = async () => {
       `SHOW max_connections`
     )
 
+    this._logger("Getting max connections from database...")
+
     this._maxConnectionsCache = {
       total: results.rows[0],
       updated: Date.now()
@@ -62,14 +66,16 @@ ServerlessClient.prototype._setMaxConnections = async () => {
 }
 
 ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
-  return this._client.query(
+  const result =  await this._client.query(
     `SELECT pid,backend_start,state 
         FROM pg_stat_activity 
         WHERE datname=$1 AND state='idle' 
         ORDER BY backend_start 
         DESC LIMIT $2;`,
-    [this._config.database, this._maxRetrivedProcesses]
+    [this._config.database, this._maxIdleConnections]
   );
+
+  return result.rows
 };
 
 ServerlessClient.prototype._getProcessesCount = async function() {
@@ -82,7 +88,7 @@ ServerlessClient.prototype._getProcessesCount = async function() {
 };
 
 ServerlessClient.prototype._killProcesses = async function(processesList) {
-  const pids = processesList.rows.map(proc => proc.pid);
+  const pids = processesList.map(proc => proc.pid);
   const query = `
     SELECT pg_terminate_backend(pid) 
     FROM pg_stat_activity 
@@ -95,11 +101,12 @@ ServerlessClient.prototype._killProcesses = async function(processesList) {
 
 ServerlessClient.prototype.clean = async function() {
   const processCount = await this._getProcessesCount();
+  this._logger("Current process count: ", processCount)
 
   if (processCount > this._maxConnections * this._connUtilization) {
     const processesList = await this._getIdleProcessesListOrderByDate();
     await this._killProcesses(processesList);
-    this._logger("Killed processes...", processesList.rows.length)
+    this._logger("Killed processes: ", processesList.length)
   }
 };
 
@@ -123,7 +130,8 @@ ServerlessClient.prototype.sconnect = async function() {
       };
 
       this._retries++;
-      let delay = 1000 * this._retries;
+      const delay = 1000 * this._retries;
+      this._logger("Current delay: ", delay)
       await backoff(delay);
     } else {
       throw e;
