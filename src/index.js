@@ -11,7 +11,6 @@ const { Client } = require("pg");
 
 function ServerlessClient(config) {
   this._config = config;
-  this._maxRetries = config.maxRetries || 3;
 
   // If this parameters is set to true it will query to get the maxConnections values,
   // to maximize performance you should set the maxConnections yourself.
@@ -36,7 +35,13 @@ function ServerlessClient(config) {
   // Past this threshold the connection killer will kick in.
   this._connUtilization = config.connUtilization || 0.8
 
-  this._retries = 1;
+  this._backoff = {
+    capMs: config.capMs,
+    baseMs: config.baseMs,
+    delayMs: config.retryDelayMs || 1000,
+    maxRetries: config.maxRetries || 3,
+    retries: 0,
+  }
 }
 
 ServerlessClient.prototype.constructor = ServerlessClient;
@@ -49,7 +54,7 @@ ServerlessClient.prototype._sleep = delay =>
 
 ServerlessClient.prototype._setMaxConnections = async () => {
   // If cache is expired
-  if (Date.now() - this._maxConnectionsCache.updated > this._maxConnsFreq) {
+  if (Date.now() - this._maxConnectionsCache.updated > this._maxConnsFreqMs) {
     const results = await this._client.query(
       `SHOW max_connections`
     )
@@ -99,6 +104,13 @@ ServerlessClient.prototype._killProcesses = async function(processesList) {
   return this._client.query(query, values)
 };
 
+ServerlessClient.prototype._decorrelatedJitter = function(delay= 0){
+  const cap = Number.isInteger(this._backoff.capMs) ? this._backoff.capMs : 100 // default to 100 ms
+  const base = Number.isInteger(this._backoff.baseMs) ? this._backoff.baseMs : 2 // default to 2 ms
+  const randRange = (min,max) => Math.floor(Math.random() * (max - min + 1)) + min
+  return Math.min(cap, randRange(base, delay * 3))
+}
+
 ServerlessClient.prototype.clean = async function() {
   const processCount = await this._getProcessesCount();
   this._logger("Current process count: ", processCount)
@@ -120,19 +132,19 @@ ServerlessClient.prototype.sconnect = async function() {
       // therefore we need to throw the instance and recreate a new one
       await this._init()
       const backoff = async delay => {
-        if (this._maxRetries > 0) {
-          this._logger(this._maxRetries, " trying to reconnect... ")
-          await this._sleep(delay);
-          this._maxRetries--;
+        if (this._backoff.retries < this._backoff.maxRetries) {
+          this._logger(this._backoff.maxRetries, " trying to reconnect... ")
+          const totalDelay = this._decorrelatedJitter(delay)
+          this._logger("total delay: ", totalDelay)
+          await this._sleep(totalDelay);
+          this._backoff.retries++;
           await this.sconnect();
-          this._logger("Re-connection successful!")
+          this._logger("Re-connection successful after ", this._backoff.retries)
         }
       };
 
-      this._retries++;
-      const delay = 1000 * this._retries;
-      this._logger("Current delay: ", delay)
-      await backoff(delay);
+      this._logger("Current delay: ", this._backoff.delayMs)
+      await backoff(this._backoff.delayMs);
     } else {
       throw e;
     }
@@ -162,6 +174,11 @@ ServerlessClient.prototype._init = async function(){
       throw err;
     }
   });
+}
+
+// TODO add validation for the client config
+ServerlessClient.prototype._validateConfig = function(){
+
 }
 
 ServerlessClient.prototype._logger = function(...args) {
