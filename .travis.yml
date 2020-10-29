@@ -4,6 +4,8 @@ node_js:
 branches:
   only:
     - master
+script:
+  - echo "skipping tests"
 jobs:
   include:
     # Define the release stage that runs semantic-release
