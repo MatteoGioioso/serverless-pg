@@ -28,6 +28,7 @@ function ServerlessClient(config) {
   // Strategy
   this._strategy = {
     name: config.strategy || 'minimum_idle_time',
+    // The minimum number of seconds that a connection must be idle before the module will recycle it.
     minConnIdleTimeSec: config.minConnectionIdleTimeSec || 0.5,
     // The bigger, the more idle connections will be killed
     // this parameters control how aggressive is going to be your strategy
@@ -45,11 +46,12 @@ function ServerlessClient(config) {
 
   // Backoff
   this._backoff = {
-    capMs: config.capMs || 100,
+    capMs: config.capMs || 1000,
     baseMs: config.baseMs || 2,
     delayMs: config.delayMs || 1000,
     maxRetries: config.maxRetries || 3,
     retries: 0,
+    queryRetries: 0
   }
 }
 
@@ -187,26 +189,23 @@ ServerlessClient.prototype.clean = async function() {
   }
 };
 
-ServerlessClient.prototype.sconnect = async function() {
+ServerlessClient.prototype.connect = async function() {
   try {
     await this._init();
   } catch (e) {
     if (e.message === "sorry, too many clients already") {
       // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
       // therefore we need to throw the instance and recreate a new one
-      const backoff = async delay => {
-        if (this._backoff.retries < this._backoff.maxRetries) {
-          this._logger(this._backoff.maxRetries, " trying to reconnect... ")
-          const totalDelay = this._decorrelatedJitter(delay)
-          this._logger("total delay: ", totalDelay)
-          await this._sleep(totalDelay);
-          this._backoff.retries++;
-          await this.sconnect();
-          this._logger("Re-connection successful after ", this._backoff.retries, " retries")
-        }
-      };
-
-      await backoff(this._backoff.delayMs);
+      if (this._backoff.retries < this._backoff.maxRetries) {
+        this._logger("trying to reconnect...attempt: ", this._backoff.retries)
+        const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
+        this._logger("total delay: ", totalDelay)
+        await this._sleep(totalDelay);
+        this._backoff.retries++;
+        await this.connect();
+      } else {
+        throw e
+      }
     } else {
       throw e;
     }
@@ -232,6 +231,7 @@ ServerlessClient.prototype._init = async function(){
   });
 
   await this._client.connect();
+  this._backoff.retries = 0
 
   if (this._maxConns.automaticMaxConnections){
     await this._setMaxConnections(this)
@@ -252,11 +252,37 @@ ServerlessClient.prototype._logger = function(...args) {
 }
 
 ServerlessClient.prototype.query = async function(...args){
-  return this._client.query(...args)
+  try {
+    // We fulfill the promise to catch the error
+    return await this._client.query(...args)
+  } catch (e) {
+    // If a client has been terminated by serverless-postgres and try to query again
+    // we re-initialize it and retry
+    if (e.message === "Client has encountered a connection error and is not queryable"){
+      if (this._backoff.queryRetries < this._backoff.maxRetries) {
+        this._logger("Retry query...attempt: ", this._backoff.queryRetries)
+        const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
+        this._logger("total delay: ", totalDelay)
+        await this._sleep(totalDelay);
+        this._backoff.queryRetries++;
+        await this.connect()
+        const result = await this.query(...args)
+        this._backoff.queryRetries = 0
+        return result
+      } else {
+        throw e
+      }
+    }
+    throw e
+  }
 }
 
 ServerlessClient.prototype.end = async function(){
-  return this._client.end()
+  this._backoff.retries = 0
+  this._backoff.queryRetries = 0
+  const result = await this._client.end()
+  this._client = null
+  return result
 }
 
 ServerlessClient.prototype.on = function(...args){
