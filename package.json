@@ -4,15 +4,17 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\"",
+    "test": "jest",
     "semantic-release": "semantic-release"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "pg": "^7.18.2"
   },
   "devDependencies": {
+    "husky": "^4.3.0",
+    "jest": "^26.6.1",
     "prettier": "^1.19.1",
     "semantic-release": "^17.2.1"
   },
@@ -21,6 +23,20 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/MatteoGioioso/serverless-pg.git"
+    "url": "git+https://github.com/MatteoGioioso/serverless-pg.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MatteoGioioso/serverless-pg/issues"
+  },
+  "homepage": "https://github.com/MatteoGioioso/serverless-pg#readme",
+  "directories": {
+    "test": "tests"
+  },
+  "keywords": [],
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run test",
+      "pre-push": "npm run test"
+    }
   }
 }
