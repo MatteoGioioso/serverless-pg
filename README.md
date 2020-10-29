@@ -38,7 +38,7 @@ npm i serverless-postgres
 
 Declare the ServerlessClient outside the lambda handler
 
-```js
+```javascript
 const client = new ServerlessClient({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
@@ -50,7 +50,7 @@ const client = new ServerlessClient({
 });
 
 const handler = async(event, context) => {
-    await client.sconnect();
+    await client.connect();
     const result = await client.query(`SELECT NOW()`);
     await client.clean();
     return {
@@ -67,13 +67,16 @@ const handler = async(event, context) => {
 
 | Property | Type | Description | Default |
 | -------- | ---- | ----------- | ------- |
-| maxRetries | `Integer` | Maximum number of times to retry a connection before throwing an error. | `3` |
-| delayMs | `Integer` | Additional delay to add to the exponential backoff. | `1000` |
-| baseMs | `Integer` | Number of milliseconds added to random backoff values. | `2` |
-| capMs | `Integer` | Maximum number of milliseconds between connection retries. | `100` |
 | config | `Object` | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client) | `{}` |
-| connUtilization | `Number` | The percentage of total connections to use when connecting to your PostgreSQL server. A value of `0.80` would use 80% of your total available connections. | `0.8` |
-| maxConnections | `Integer` | Max connections of your PostgreSQL. | `100` |
 | maxConnsFreqMs | `Integer` | The number of milliseconds to cache lookups of max_connections. | `60000` |
 | automaticMaxConnections | `Boolean` | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself | `false` |
+| maxConnections | `Integer` | Max connections of your PostgreSQL. I highly suggest to set this yourself | `100` |
+| strategy | `String` | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked` | `minimum_idle_time` |
+| minConnectionIdleTimeSec | `Integer` | The minimum number of seconds that a connection must be idle before the module will recycle it. | `0.5` |
+| maxIdleConnectionsToKill | `Integer` or `null` | The amount of max connection that will get killed. Default is `ALL` | `null` |
+| connUtilization | `Number` | The percentage of total connections to use when connecting to your PostgreSQL server. A value of `0.80` would use 80% of your total available connections. | `0.8` |
 | debug | `Boolean` | Enable/disable debugging logs | `false` |
+| capMs | `Integer` | Maximum number of milliseconds between connection retries. | `1000` |
+| baseMs | `Integer` | Number of milliseconds added to random backoff values. | `2` |
+| delayMs | `Integer` | Additional delay to add to the exponential backoff. | `1000` |
+| maxRetries | `Integer` | Maximum number of times to retry a connection before throwing an error. | `3` |
