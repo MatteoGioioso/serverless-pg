@@ -19,7 +19,7 @@ function ServerlessClient(config) {
     // If this parameters is set to true it will query to get the maxConnections values,
     // to maximize performance you should set the maxConnections yourself.
     // Is suggested to manually set the maxConnections and keep this setting to false.
-    automaticMaxConnections: config.automaticMaxConnections,
+    manualMaxConnections: config.manualMaxConnections,
     cache: {
       total: config.maxConnections || 100,
       updated: 0
@@ -68,11 +68,12 @@ ServerlessClient.prototype._setMaxConnections = async (__self) => {
   // If cache is expired
   if (Date.now() - __self._maxConns.cache.updated > __self._maxConns.freqMs) {
     const results = await __self._client.query(`SHOW max_connections`)
+    const maxConnections = results.rows[0].max_connections
 
-    __self._logger("Getting max connections from database...")
+    __self._logger("Getting max connections from database...", maxConnections)
 
     __self._maxConns.cache = {
-      total: results.rows[0].max_connections,
+      total: maxConnections,
       updated: Date.now()
     }
   }
@@ -184,32 +185,10 @@ ServerlessClient.prototype.clean = async function() {
   if (processCount > this._maxConns.cache.total * this._strategy.connUtilization) {
     const strategy = this._getStrategy();
     const processesList = await strategy();
-    const killedProcesses = await this._killProcesses(processesList);
-    this._logger("+++++ Killed processes: ", killedProcesses.rows.length, " +++++")
-    return killedProcesses.rows
-  }
-};
-
-ServerlessClient.prototype.connect = async function() {
-  try {
-    await this._init();
-  } catch (e) {
-    if (e.message === "sorry, too many clients already") {
-      this._client = null
-      // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
-      // therefore we need to throw the instance and recreate a new one
-      if (this._backoff.retries < this._backoff.maxRetries) {
-        this._logger("trying to reconnect...attempt: ", this._backoff.retries)
-        const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
-        this._logger("total delay: ", totalDelay)
-        await this._sleep(totalDelay);
-        this._backoff.retries++;
-        await this.connect();
-      } else {
-        throw e
-      }
-    } else {
-      throw e;
+    if (processesList.length) {
+      const killedProcesses = await this._killProcesses(processesList);
+      this._logger("+++++ Killed processes: ", killedProcesses.rows.length, " +++++")
+      return killedProcesses.rows
     }
   }
 };
@@ -229,6 +208,7 @@ ServerlessClient.prototype._init = async function(){
       err.message === "Connection terminated unexpectedly"
     ) {
       // Swallow the error
+      this._logger("Swallowed error: ", err.message)
     } else if (err.message === "sorry, too many clients already") {
       throw err;
     } else {
@@ -237,14 +217,13 @@ ServerlessClient.prototype._init = async function(){
   });
 
   await this._client.connect();
-  this._backoff.retries = 0
+  this._logger("Connected...")
 
-  if (this._maxConns.automaticMaxConnections){
+  if (this._maxConns.manualMaxConnections){
     await this._setMaxConnections(this)
   }
 
   this._logger("Max connections: ", this._maxConns.cache.total)
-  this._logger("Connected...")
 }
 
 // TODO add validation for the client config
@@ -254,9 +233,38 @@ ServerlessClient.prototype._validateConfig = function(){
 
 ServerlessClient.prototype._logger = function(...args) {
   if (this._debug){
-    console.log('\x1b[36m%s\x1b[0m', 'serverless-pg | ', ...args)
+    const pid = this._client && this._client.processID || 'offline'
+    console.log('serverless-pg | pid: ', pid, ' | ',  ...args)
   }
 }
+
+ServerlessClient.prototype.connect = async function() {
+  try {
+    await this._init();
+  } catch (e) {
+    if (
+      e.message === "sorry, too many clients already" ||
+      e.message === "Connection terminated unexpectedly"
+    ) {
+      this._client = null
+      // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
+      // therefore we need to throw the instance and recreate a new one
+      if (this._backoff.retries < this._backoff.maxRetries) {
+        this._logger("trying to reconnect...attempt: ", this._backoff.retries)
+        const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
+        this._logger("total delay: ", totalDelay)
+        await this._sleep(totalDelay);
+        this._backoff.retries++;
+        await this.connect();
+        this._backoff.retries = 0
+      } else {
+        throw e
+      }
+    } else {
+      throw e;
+    }
+  }
+};
 
 ServerlessClient.prototype.query = async function(...args){
   try {
