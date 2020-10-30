@@ -10,6 +10,7 @@
 const { Client } = require("pg");
 
 function ServerlessClient(config) {
+  this._client = null;
   this._config = config;
 
   this._maxConns = {
@@ -194,6 +195,7 @@ ServerlessClient.prototype.connect = async function() {
     await this._init();
   } catch (e) {
     if (e.message === "sorry, too many clients already") {
+      this._client = null
       // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
       // therefore we need to throw the instance and recreate a new one
       if (this._backoff.retries < this._backoff.maxRetries) {
@@ -213,6 +215,10 @@ ServerlessClient.prototype.connect = async function() {
 };
 
 ServerlessClient.prototype._init = async function(){
+  if(this._client !== null){
+    return
+  }
+
   this._client = new Client(this._config)
 
   // pg throws an error if we terminate the connection, therefore we need to swallow these errors
@@ -238,6 +244,7 @@ ServerlessClient.prototype._init = async function(){
   }
 
   this._logger("Max connections: ", this._maxConns.cache.total)
+  this._logger("Connected...")
 }
 
 // TODO add validation for the client config
@@ -258,6 +265,8 @@ ServerlessClient.prototype.query = async function(...args){
   } catch (e) {
     // If a client has been terminated by serverless-postgres and try to query again
     // we re-initialize it and retry
+    this._client = null
+
     if (e.message === "Client has encountered a connection error and is not queryable"){
       if (this._backoff.queryRetries < this._backoff.maxRetries) {
         this._logger("Retry query...attempt: ", this._backoff.queryRetries)

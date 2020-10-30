@@ -35,8 +35,7 @@
   "keywords": [],
   "husky": {
     "hooks": {
-      "pre-commit": "npm run test",
-      "pre-push": "npm run test"
+      "pre-commit": "npm run test"
     }
   }
 }
