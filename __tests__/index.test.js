@@ -116,7 +116,7 @@ describe("Serverless client", function() {
         port: 5432,
         connUtilization: 0.09,
         debug: false,
-        automaticMaxConnections: true,
+        manualMaxConnections: true,
         maxConnections: 2
       })
 
@@ -244,6 +244,7 @@ describe("Serverless client", function() {
         password: "postgres",
         port: 5432,
         connUtilization: 0.09,
+        debug: true
       });
       await client.connect()
 

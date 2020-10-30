@@ -1,0 +1,11 @@
+config:
+  target: 'https://exzsi21ncc.execute-api.ap-southeast-1.amazonaws.com/Prod/'
+  phases:
+    - duration: 20 # seconds
+      arrivalRate: 100 # requests per seconds
+
+scenarios:
+  - name: "Connect"
+    flow:
+      - get:
+          url: "/"
