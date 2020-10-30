@@ -48,9 +48,9 @@ const client = new ServerlessClient({
     debug: true,
     delayMs: 3000,
 });
+await client.connect();
 
 const handler = async(event, context) => {
-    await client.connect();
     const result = await client.query(`SELECT NOW()`);
     await client.clean();
     return {
