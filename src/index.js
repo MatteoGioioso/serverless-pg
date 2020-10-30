@@ -244,7 +244,8 @@ ServerlessClient.prototype.connect = async function() {
   } catch (e) {
     if (
       e.message === "sorry, too many clients already" ||
-      e.message === "Connection terminated unexpectedly"
+      e.message === "Connection terminated unexpectedly" ||
+      e.message === "terminating connection due to administrator command"
     ) {
       this._client = null
       // Client in node-pg is usable only one time, once it errors we cannot re-connect again,
