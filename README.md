@@ -69,7 +69,7 @@ const handler = async(event, context) => {
 | -------- | ---- | ----------- | ------- |
 | config | `Object` | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client) | `{}` |
 | maxConnsFreqMs | `Integer` | The number of milliseconds to cache lookups of max_connections. | `60000` |
-| automaticMaxConnections | `Boolean` | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself | `false` |
+| manualMaxConnections | `Boolean` | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself | `false` |
 | maxConnections | `Integer` | Max connections of your PostgreSQL. I highly suggest to set this yourself | `100` |
 | strategy | `String` | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked` | `minimum_idle_time` |
 | minConnectionIdleTimeSec | `Integer` | The minimum number of seconds that a connection must be idle before the module will recycle it. | `0.5` |
