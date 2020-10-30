@@ -238,6 +238,7 @@ ServerlessClient.prototype._init = async function(){
   }
 
   this._logger("Max connections: ", this._maxConns.cache.total)
+  this._logger("Connected...")
 }
 
 // TODO add validation for the client config
