@@ -112,7 +112,7 @@ ServerlessClient.prototype._killProcesses = async function(processesList) {
   const query = `
     SELECT pg_terminate_backend(pid) 
     FROM pg_stat_activity 
-    WHERE pid = ANY ($1);`
+    WHERE pid = ANY ($1) AND state='idle';`
 
   const values = [pids]
 
