@@ -39,6 +39,8 @@ npm i serverless-postgres
 Declare the ServerlessClient outside the lambda handler
 
 ```javascript
+const ServerlessClient = require('serverless-postgres')
+
 const client = new ServerlessClient({
     user: process.env.DB_USER,
     host: process.env.DB_HOST,
@@ -51,16 +53,38 @@ const client = new ServerlessClient({
 
 const handler = async(event, context) => {
     await client.connect();
-    const result = await client.query(`SELECT NOW()`);
+    const result = await client.query(`SELECT 1+1 AS result`);
     await client.clean();
     return {
-      body: JSON.stringify({message: result}),
+      body: JSON.stringify({message: result.rows[0]}),
       statusCode: 200
     }
 }
 
+```
+
+You can set the configuration dynamically if your secret is stored in a vault
+
+```javascript
+const ServerlessClient = require('serverless-postgres')
+
+const client = new ServerlessClient({
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
+});
+
+const handler = async(event, context) => {
+    const {user, password} = await getCredentials('my-secret')
+    client.setConfig({
+      user, password
+    })
+    await client.connect();
+    // ...rest of the code
+}
 
 ```
+
 
 
 ## Configuration Options
