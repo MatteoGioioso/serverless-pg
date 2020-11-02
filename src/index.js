@@ -7,53 +7,12 @@
  * @license MIT
  */
 
+const { isValidStrategy, type, validateNum, isWithinRange } = require("./utils");
 const { Client } = require("pg");
 
 function ServerlessClient(config) {
   this._client = null;
-  this._config = config;
-
-  this._maxConns = {
-    // Cache expiration for getting the max connections value in milliseconds
-    freqMs: config.maxConnsFreqMs || 60000,
-    // If this parameters is set to true it will query to get the maxConnections values,
-    // to maximize performance you should set the maxConnections yourself.
-    // Is suggested to manually set the maxConnections and keep this setting to false.
-    manualMaxConnections: config.manualMaxConnections,
-    cache: {
-      total: config.maxConnections || 100,
-      updated: 0
-    }
-  }
-
-  // Strategy
-  this._strategy = {
-    name: config.strategy || 'minimum_idle_time',
-    // The minimum number of seconds that a connection must be idle before the module will recycle it.
-    minConnIdleTimeSec: config.minConnectionIdleTimeSec || 0.5,
-    // The bigger, the more idle connections will be killed
-    // this parameters control how aggressive is going to be your strategy
-    // default is null which will means LIMIT ALL
-    maxIdleConnectionsToKill: config.maxIdleConnectionsToKill || null,
-
-    // The percentage of total connections to use when connecting to your Postgres server.
-    // A value of 0.75 would use 75% of your total available connections.
-    // Past this threshold the connection killer will kick in.
-    connUtilization: config.connUtilization || 0.8
-  }
-
-  // Activate debugging logger
-  this._debug = config.debug
-
-  // Backoff
-  this._backoff = {
-    capMs: config.capMs || 1000,
-    baseMs: config.baseMs || 2,
-    delayMs: config.delayMs || 1000,
-    maxRetries: config.maxRetries || 3,
-    retries: 0,
-    queryRetries: 0
-  }
+  this.setConfig(config)
 }
 
 ServerlessClient.prototype.constructor = ServerlessClient;
@@ -226,9 +185,120 @@ ServerlessClient.prototype._init = async function(){
   this._logger("Max connections: ", this._maxConns.cache.total)
 }
 
-// TODO add validation for the client config
-ServerlessClient.prototype._validateConfig = function(){
+ServerlessClient.prototype._validateConfig = function(config){
+  const {
+    manualMaxConnections,
+    maxConnsFreqMs,
+    maxConnections,
+    strategy,
+    debug,
+    maxIdleConnectionsToKill,
+    minConnectionIdleTimeSec,
+    connUtilization,
+    capMs,
+    baseMs,
+    delayMs,
+    maxRetries
+  } = config
 
+  if (
+    manualMaxConnections &&
+    type(manualMaxConnections) !== "Boolean"
+  ){
+    throw new Error("manualMaxConnections must be of type Boolean")
+  }
+
+  if (debug && type(debug) !== "Boolean"){
+    throw new Error("debug must be of type Boolean")
+  }
+
+  if (validateNum(maxConnsFreqMs)){
+    throw new Error("maxConnsFreqMs must be of type Number")
+  }
+
+  if (validateNum(maxConnections)){
+    throw new Error("maxConnections must be of type Number")
+  }
+
+  if (strategy && !isValidStrategy(strategy)){
+    throw new Error("the provided strategy is invalid")
+  }
+
+  if (validateNum(maxIdleConnectionsToKill)){
+    throw new Error("maxIdleConnectionsToKill must be of type Number or null")
+  }
+
+  if (validateNum(minConnectionIdleTimeSec)){
+    throw new Error("minConnectionIdleTimeSec must be of type Number")
+  }
+
+  if (validateNum(connUtilization) || !isWithinRange(connUtilization, 0, 1)){
+    throw new Error("connUtilization must be of type Number")
+  }
+
+  if (validateNum(capMs)){
+    throw new Error("capMs must be of type Number")
+  }
+
+  if (validateNum(baseMs)){
+    throw new Error("baseMs must be of type Number")
+  }
+
+  if (validateNum(delayMs)){
+    throw new Error("delayMs must be of type Number")
+  }
+
+  if (validateNum(maxRetries)){
+    throw new Error("maxRetries must be of type Number")
+  }
+}
+
+ServerlessClient.prototype.setConfig = function (config) {
+  this._client = null;
+  this._validateConfig(config)
+  this._config = { ...this._config, ...config };
+
+  this._maxConns = {
+    // Cache expiration for getting the max connections value in milliseconds
+    freqMs: config.maxConnsFreqMs || 60000,
+    // If this parameters is set to true it will query to get the maxConnections values,
+    // to maximize performance you should set the maxConnections yourself.
+    // Is suggested to manually set the maxConnections and keep this setting to false.
+    manualMaxConnections: config.manualMaxConnections,
+    cache: {
+      total: config.maxConnections || 100,
+      updated: 0
+    }
+  }
+
+  // Strategy
+  this._strategy = {
+    name: config.strategy || 'minimum_idle_time',
+    // The minimum number of seconds that a connection must be idle before the module will recycle it.
+    minConnIdleTimeSec: config.minConnectionIdleTimeSec || 0.5,
+    // The bigger, the more idle connections will be killed
+    // this parameters control how aggressive is going to be your strategy
+    // default is null which will means LIMIT ALL
+    maxIdleConnectionsToKill: config.maxIdleConnectionsToKill || null,
+
+    // The percentage of total connections to use when connecting to your Postgres server.
+    // A value of 0.75 would use 75% of your total available connections.
+    // Past this threshold the connection killer will kick in.
+    connUtilization: config.connUtilization || 0.8
+  }
+
+  // Activate debugging logger
+  this._debug = config.debug
+
+  // Backoff
+  this._backoff = {
+    capMs: config.capMs || 1000,
+    baseMs: config.baseMs || 2,
+    delayMs: config.delayMs || 1000,
+    maxRetries: config.maxRetries || 3,
+    retries: 0,
+    queryRetries: 0
+  }
 }
 
 ServerlessClient.prototype._logger = function(...args) {
@@ -269,6 +339,7 @@ ServerlessClient.prototype.connect = async function() {
 
 ServerlessClient.prototype.query = async function(...args){
   try {
+    this._logger("Start query...")
     // We fulfill the promise to catch the error
     return await this._client.query(...args)
   } catch (e) {
@@ -276,7 +347,10 @@ ServerlessClient.prototype.query = async function(...args){
     // we re-initialize it and retry
     this._client = null
 
-    if (e.message === "Client has encountered a connection error and is not queryable"){
+    if (
+      e.message === "Client has encountered a connection error and is not queryable" ||
+      e.message === "terminating connection due to administrator command"
+    ){
       if (this._backoff.queryRetries < this._backoff.maxRetries) {
         this._logger("Retry query...attempt: ", this._backoff.queryRetries)
         const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
