@@ -56,9 +56,15 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
     this._strategy.maxIdleConnectionsToKill
   ]
 
-  const result = await this._client.query(query, values);
+  try {
+    const result = await this._client.query(query, values);
 
-  return result.rows
+    return result.rows
+  } catch (e){
+    this._logger("Swallowed internal error", e.message)
+    // Swallow the error, if this produce an error there is no need to error the function
+    return []
+  }
 };
 
 // This strategy select only the connections that have been in idle state for more
@@ -87,9 +93,15 @@ ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async functio
     this._strategy.maxIdleConnectionsToKill
   ]
 
-  const result = await this._client.query(query, values)
+  try {
+    const result = await this._client.query(query, values)
 
-  return result.rows
+    return result.rows
+  } catch (e) {
+    this._logger("Swallowed internal error", e.message)
+    // Swallow the error, if this produce an error there is no need to error the function
+    return []
+  }
 }
 
 ServerlessClient.prototype._getProcessesCount = async function() {
@@ -101,9 +113,15 @@ ServerlessClient.prototype._getProcessesCount = async function() {
 
   const values = [this._config.database, this._config.user]
 
-  const result = await this._client.query(query, values);
+  try {
+    const result = await this._client.query(query, values);
 
-  return result.rows[0].count;
+    return result.rows[0].count;
+  } catch (e){
+    this._logger("Swallowed internal error", e.message)
+    // Swallow the error, if this produce an error there is no need to error the function
+    return 0
+  }
 };
 
 ServerlessClient.prototype._killProcesses = async function(processesList) {
@@ -116,7 +134,16 @@ ServerlessClient.prototype._killProcesses = async function(processesList) {
 
   const values = [pids]
 
-  return this._client.query(query, values)
+  try {
+    return await this._client.query(query, values)
+  } catch (e){
+    this._logger("Swallowed internal error", e.message)
+    // Swallow the error, if this produce an error there is no need to error the function
+
+    return {
+      rows: []
+    }
+  }
 };
 
 ServerlessClient.prototype._getStrategy = function(){
@@ -349,7 +376,8 @@ ServerlessClient.prototype.query = async function(...args){
 
     if (
       e.message === "Client has encountered a connection error and is not queryable" ||
-      e.message === "terminating connection due to administrator command"
+      e.message === "terminating connection due to administrator command" ||
+      e.message === "Connection terminated unexpectedly"
     ){
       if (this._backoff.queryRetries < this._backoff.maxRetries) {
         this._logger("Retry query...attempt: ", this._backoff.queryRetries)
