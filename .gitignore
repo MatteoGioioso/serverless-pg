@@ -1,2 +1,4 @@
 /node_modules
 .idea
+tests
+__tests__/run.sh
