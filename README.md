@@ -5,6 +5,7 @@
 ![GitHub](https://img.shields.io/github/license/MatteoGioioso/serverless-pg)
 
 Serverless-postgres is a wrapper for **[node-pg](https://github.com/brianc/node-postgres)** Node.js module.
+It is heavily inspired by Jeremy Daly's **[serverless-mysql](https://github.com/jeremydaly/serverless-mysql)** package.
 
 ### Why I need this module?
 In a serverless application a function can scale almost "infinitely" by creating separate container instances 
