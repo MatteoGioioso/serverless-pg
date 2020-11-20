@@ -1,8 +1,8 @@
 config:
   target: "{{ $processEnvironment.URL }}"
   phases:
-    - duration: 2 # seconds
-      arrivalRate: 2 # requests per seconds
+    - duration: 10 # seconds
+      arrivalRate: 50 # requests per seconds
 
 scenarios:
   - name: "Connect"
