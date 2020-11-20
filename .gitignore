@@ -2,3 +2,4 @@
 .idea
 tests
 __tests__/run.sh
+__tests__/Postgres.run.xml
