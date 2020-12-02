@@ -400,13 +400,12 @@ ServerlessClient.prototype.query = async function(...args){
 ServerlessClient.prototype.end = async function(){
   this._backoff.retries = 0
   this._backoff.queryRetries = 0
-  const result = await this._client.end()
+  await this._client.end()
   this._client = null
-  return result
 }
 
 ServerlessClient.prototype.on = function(...args){
-  return this._client.on(...args)
+  this._client.on(...args)
 }
 
 module.exports = { ServerlessClient };
