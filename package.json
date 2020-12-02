@@ -18,6 +18,7 @@
     "prettier": "^1.19.1",
     "semantic-release": "^17.2.1"
   },
+  "typings": "index.d.ts",
   "prettier": {
     "printWidth": 100
   },
