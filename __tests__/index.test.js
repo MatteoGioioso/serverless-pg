@@ -17,7 +17,7 @@ const generateMockConnections = async (n) => {
       host: "localhost",
       database: "postgres",
       password: "postgres",
-      port: 5432,
+      port: 5433,
     })
 
     await c.connect()
@@ -51,7 +51,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         connUtilization: 0.09,
       });
       await client.connect()
@@ -113,7 +113,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         connUtilization: 0.09,
         debug: false,
         manualMaxConnections: true,
@@ -127,6 +127,47 @@ describe("Serverless client", function() {
 
       await client1.end()
     });
+
+    it("should cache process count", async function() {
+      const client1 = new ServerlessClient({
+        user: "postgres",
+        host: "localhost",
+        database: "postgres",
+        password: "postgres",
+        port: 5433,
+        processCountCacheEnabled: true,
+        processCountFreqMs: 2000,
+        debug: true
+      })
+      await client1.connect();
+      const mockClients = await generateMockConnections(10);
+
+      // At the beginning the cache count should be 0
+      expect(client1._processCount.cache.count).toBe(0);
+
+      // Upon invoking _getProcessCount it should set the cache
+      const count = await client1._getProcessesCount();
+
+      expect(client1._processCount.cache.count).toBe("12");
+      expect(count).toBe(client1._processCount.cache.count)
+
+      // More incoming connections, but the count should still be cached
+      const moreMockClients = await generateMockConnections(10);
+      const count2 = await client1._getProcessesCount();
+
+      expect(count2).toBe(client1._processCount.cache.count)
+      expect(client1._processCount.cache.count).toBe("12");
+
+      // Wait for cache to expire and count again
+      await sleep(2100)
+      const count3 = await client1._getProcessesCount();
+
+      expect(count3).toBe(client1._processCount.cache.count)
+      expect(client1._processCount.cache.count).toBe("22");
+
+      await client1.end()
+      await cleanMockConnections([...mockClients, ...moreMockClients])
+    });
   });
 
   describe("Ranked strategy", function() {
@@ -138,7 +179,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         connUtilization: 0.09,
         debug: false,
         strategy: "ranked"
@@ -191,7 +232,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         debug: true
       });
 
@@ -220,7 +261,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         debug: true,
       });
 
@@ -242,7 +283,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5432,
+        port: 5433,
         connUtilization: 0.09,
       });
       await client.connect()
@@ -268,7 +309,7 @@ describe("Serverless client", function() {
         user: "postgres",
         host: "localhost",
         database: "postgres",
-        port: 5432,
+        port: 5433,
         connUtilization: 0.09,
       });
       client.setConfig({
@@ -283,94 +324,94 @@ describe("Serverless client", function() {
   });
 
   describe("Validation", function() {
-    it("should reject the instantiation an invalid value has been provided", function() {
-      try {
-        new ServerlessClient({
-          user: "postgres",
-          host: "localhost",
-          database: "postgres",
-          password: "postgres",
-          port: 5432,
-          strategy: 'invalid_strategy'
-        });
-
-        expect(true).toBeFalsy()
-      } catch (e) {
-
-        expect(e.message).toBe("the provided strategy is invalid")
+    [
+      {
+        name: 'should reject the instantiation an invalid strategy',
+        args: {
+          config: {
+            user: "postgres",
+            host: "localhost",
+            database: "postgres",
+            password: "postgres",
+            port: 5433,
+            strategy: 'invalid_strategy'
+          }
+        },
+        wants: {
+          errorMessage: "the provided strategy is invalid"
+        }
+      },
+      {
+        name: 'should reject the instantiation an invalid debug value',
+        args: {
+          config: {
+            user: "postgres",
+            host: "localhost",
+            database: "postgres",
+            password: "postgres",
+            port: 5433,
+            debug: []
+          }},
+        wants: {
+          errorMessage: "debug must be of type Boolean"
+        }
+      },
+      {
+        name: 'should reject the instantiation an invalid maxIdleConnectionsToKill',
+        args: {
+          config: {
+            user: "postgres",
+            host: "localhost",
+            database: "postgres",
+            password: "postgres",
+            port: 5433,
+            maxIdleConnectionsToKill: "null"
+          }},
+        wants: {
+          errorMessage: "maxIdleConnectionsToKill must be of type Number or null"
+        }
+      },
+      {
+        name: 'should reject the instantiation an invalid maxConnsFreqMs',
+        args: {
+          config: {
+            user: "postgres",
+            host: "localhost",
+            database: "postgres",
+            password: "postgres",
+            port: 5433,
+            maxConnsFreqMs: -200
+          }},
+        wants: {
+          errorMessage: "maxConnsFreqMs must be of type Number"
+        }
+      },
+      {
+        name: 'should reject the instantiation an invalid connUtilization',
+        args: {
+          config: {
+            user: "postgres",
+            host: "localhost",
+            database: "postgres",
+            password: "postgres",
+            port: 5433,
+            connUtilization: 1.2
+          }},
+        wants: {
+          errorMessage: "connUtilization must be of type Number"
+        }
       }
-    })
+    ].forEach(test => {
+      it(test.name, function() {
+        try {
+          new ServerlessClient(test.args.config);
 
-    it("should reject the instantiation an invalid value has been provided", function() {
-      try {
-        new ServerlessClient({
-          user: "postgres",
-          host: "localhost",
-          database: "postgres",
-          password: "postgres",
-          port: 5432,
-          debug: []
-        });
+          expect(true).toBeFalsy()
+        } catch (e) {
 
-        expect(true).toBeFalsy()
-      } catch (e) {
-
-        expect(e.message).toBe("debug must be of type Boolean")
-      }
-    })
-
-    it("should reject the instantiation an invalid value has been provided", function() {
-      try {
-        new ServerlessClient({
-          user: "postgres",
-          host: "localhost",
-          database: "postgres",
-          password: "postgres",
-          port: 5432,
-          maxIdleConnectionsToKill: "null"
-        });
-
-        expect(true).toBeFalsy()
-      } catch (e) {
-
-        expect(e.message).toBe("maxIdleConnectionsToKill must be of type Number or null")
-      }
-    })
-
-    it("should reject the instantiation an invalid value has been provided", function() {
-      try {
-        new ServerlessClient({
-          user: "postgres",
-          host: "localhost",
-          database: "postgres",
-          password: "postgres",
-          port: 5432,
-          maxConnsFreqMs: -200
-        });
-
-        expect(true).toBeFalsy()
-      } catch (e) {
-
-        expect(e.message).toBe("maxConnsFreqMs must be of type Number")
-      }
-    })
-
-    it("should reject the instantiation an invalid value has been provided", function() {
-      try {
-        new ServerlessClient({
-          user: "postgres",
-          host: "localhost",
-          database: "postgres",
-          password: "postgres",
-          port: 5432,
-          connUtilization: 1.2
-        });
-
-        expect(true).toBeFalsy()
-      } catch (e) {
-
-        expect(e.message).toBe("connUtilization must be of type Number")
-      }
+          expect(e.message).toBe(test.wants.errorMessage)
+        }
+      })
     })
   });
 });

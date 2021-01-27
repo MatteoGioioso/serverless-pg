@@ -24,18 +24,20 @@ declare interface Config {
   idle_in_transaction_session_timeout?: number;
   application_name?: string;
   connectionTimeoutMillis?: number;
-  manualMaxConnections?: number
-  maxConnsFreqMs?: number
-  maxConnections?: number
-  strategy?: string
-  debug?: boolean
-  maxIdleConnectionsToKill?: number
-  minConnectionIdleTimeSec?: number
-  connUtilization?: number
-  capMs?: number
-  baseMs?: number
-  delayMs?: number
-  maxRetries?: number
+  manualMaxConnections?: number;
+  maxConnsFreqMs?: number;
+  maxConnections?: number;
+  processCountFreqMs?: number;
+  processCountCacheEnabled?: boolean;
+  strategy?: string;
+  debug?: boolean;
+  maxIdleConnectionsToKill?: number;
+  minConnectionIdleTimeSec?: number;
+  connUtilization?: number;
+  capMs?: number;
+  baseMs?: number;
+  delayMs?: number;
+  maxRetries?: number;
 }
 
 declare class ServerlessClient {
