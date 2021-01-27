@@ -105,23 +105,41 @@ ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async functio
 }
 
 ServerlessClient.prototype._getProcessesCount = async function() {
-  const query = `
-    SELECT COUNT(pid) 
-    FROM pg_stat_activity 
-    WHERE datname=$1 
-      AND usename=$2;`
-
-  const values = [this._config.database, this._config.user]
-
-  try {
-    const result = await this._client.query(query, values);
-
-    return result.rows[0].count;
-  } catch (e){
-    this._logger("Swallowed internal error", e.message)
-    // Swallow the error, if this produce an error there is no need to error the function
-    return 0
+  function isCacheExpiredOrDisabled(__self) {
+    // If cache is disabled
+    if (!__self._processCount.cacheEnabled) {
+      return true
+    }
+    // If cache is enabled check if it is expired
+    return Date.now() - __self._processCount.cache.updated > __self._processCount.freqMs
   }
+
+  if (isCacheExpiredOrDisabled(this)) {
+    const query = `
+        SELECT COUNT(pid)
+        FROM pg_stat_activity
+        WHERE datname = $1
+          AND usename = $2;`
+
+    const values = [this._config.database, this._config.user]
+
+    try {
+      const result = await this._client.query(query, values);
+      this._processCount.cache = {
+        count: result.rows[0].count || 0,
+        updated: Date.now()
+      }
+
+      return result.rows[0].count;
+    } catch (e) {
+      this._logger("Swallowed internal error", e.message)
+      // Swallow the error, if this produce an error there is no need to error the function
+      return 0
+    }
+  }
+
+  // Return cached value
+  return this._processCount.cache.count
 };
 
 ServerlessClient.prototype._killProcesses = async function(processesList) {
@@ -281,7 +299,6 @@ ServerlessClient.prototype._validateConfig = function(config){
 }
 
 ServerlessClient.prototype.setConfig = function (config) {
-  this._client = null;
   this._validateConfig(config)
   this._config = { ...this._config, ...config };
 
@@ -294,6 +311,16 @@ ServerlessClient.prototype.setConfig = function (config) {
     manualMaxConnections: config.manualMaxConnections,
     cache: {
       total: config.maxConnections || 100,
+      updated: 0
+    }
+  }
+
+  this._processCount = {
+    // Cache expiration for getting the process count value value in milliseconds
+    freqMs: config.processCountFreqMs || 6000,
+    cacheEnabled: config.processCountCacheEnabled,
+    cache: {
+      count: 0,
       updated: 0
     }
   }
