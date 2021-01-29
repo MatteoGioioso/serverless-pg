@@ -434,5 +434,30 @@ describe("Serverless client", function() {
       expect(client._debug).toBe(true)
       expect(client._maxConns.cache.total).toBe(500)
     })
+
+    it("should setConfig correctly and override previous options", async function() {
+      const client = new ServerlessClient({
+        user: "wrong user",
+        host: "localhost",
+        database: "postgres",
+        password: "wrong password",
+        port: 5433,
+        connUtilization: 0.09,
+        debug: true,
+        maxConnections: 500
+      });
+      client.setConfig({
+        user: "postgres",
+        password: "postgres",
+        debug: false,
+        maxConnections: 8
+      })
+
+      await client.connect()
+      await client.end()
+
+      expect(client._debug).toBe(false)
+      expect(client._maxConns.cache.total).toBe(8)
+    })
   });
 });
