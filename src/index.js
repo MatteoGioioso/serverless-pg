@@ -304,21 +304,21 @@ ServerlessClient.prototype.setConfig = function (config) {
 
   this._maxConns = {
     // Cache expiration for getting the max connections value in milliseconds
-    freqMs: config.maxConnsFreqMs || 60000,
+    freqMs: this._config.maxConnsFreqMs || 60000,
     // If this parameters is set to true it will query to get the maxConnections values,
     // to maximize performance you should set the maxConnections yourself.
     // Is suggested to manually set the maxConnections and keep this setting to false.
-    manualMaxConnections: config.manualMaxConnections,
+    manualMaxConnections: this._config.manualMaxConnections,
     cache: {
-      total: config.maxConnections || 100,
+      total: this._config.maxConnections || 100,
       updated: 0
     }
   }
 
   this._processCount = {
     // Cache expiration for getting the process count value value in milliseconds
-    freqMs: config.processCountFreqMs || 6000,
-    cacheEnabled: config.processCountCacheEnabled,
+    freqMs: this._config.processCountFreqMs || 6000,
+    cacheEnabled: this._config.processCountCacheEnabled,
     cache: {
       count: 0,
       updated: 0
@@ -327,29 +327,29 @@ ServerlessClient.prototype.setConfig = function (config) {
 
   // Strategy
   this._strategy = {
-    name: config.strategy || 'minimum_idle_time',
+    name: this._config.strategy || 'minimum_idle_time',
     // The minimum number of seconds that a connection must be idle before the module will recycle it.
-    minConnIdleTimeSec: config.minConnectionIdleTimeSec || 0.5,
+    minConnIdleTimeSec: this._config.minConnectionIdleTimeSec || 0.5,
     // The bigger, the more idle connections will be killed
     // this parameters control how aggressive is going to be your strategy
     // default is null which will means LIMIT ALL
-    maxIdleConnectionsToKill: config.maxIdleConnectionsToKill || null,
+    maxIdleConnectionsToKill: this._config.maxIdleConnectionsToKill || null,
 
     // The percentage of total connections to use when connecting to your Postgres server.
     // A value of 0.75 would use 75% of your total available connections.
     // Past this threshold the connection killer will kick in.
-    connUtilization: config.connUtilization || 0.8
+    connUtilization: this._config.connUtilization || 0.8
   }
 
   // Activate debugging logger
-  this._debug = config.debug
+  this._debug = this._config.debug
 
   // Backoff
   this._backoff = {
-    capMs: config.capMs || 1000,
-    baseMs: config.baseMs || 2,
-    delayMs: config.delayMs || 1000,
-    maxRetries: config.maxRetries || 3,
+    capMs: this._config.capMs || 1000,
+    baseMs: this._config.baseMs || 2,
+    delayMs: this._config.delayMs || 1000,
+    maxRetries: this._config.maxRetries || 3,
     retries: 0,
     queryRetries: 0
   }

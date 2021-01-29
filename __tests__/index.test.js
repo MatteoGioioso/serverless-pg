@@ -413,5 +413,26 @@ describe("Serverless client", function() {
         }
       })
     })
+
+    it("should persist the config object even when setConfig is called", async function() {
+      const client = new ServerlessClient({
+        user: "postgres",
+        host: "localhost",
+        database: "postgres",
+        port: 5433,
+        connUtilization: 0.09,
+        debug: true,
+        maxConnections: 500
+      });
+      client.setConfig({
+        password: "postgres"
+      })
+
+      await client.connect()
+      await client.end()
+
+      expect(client._debug).toBe(true)
+      expect(client._maxConns.cache.total).toBe(500)
+    })
   });
 });
