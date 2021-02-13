@@ -107,3 +107,10 @@ const handler = async(event, context) => {
 | maxRetries | `Integer` | Maximum number of times to retry a connection before throwing an error. | `3` |
 | processCountCacheEnabled | `Boolean` | Enable caching for get process count. | `False` |
 | processCountFreqMs | `Integer` | The number of milliseconds to cache lookups of process count. | `6000` |
+
+
+## Note
+
+- `Serverless-postgres` depends on `pg` package and usually you **do not need to install it on your own**. 
+  As some users have observed, if you have installed it on your own, and it is a different version,
+  this package might misbehave.
