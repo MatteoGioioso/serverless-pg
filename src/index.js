@@ -51,8 +51,8 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function() {
     LIMIT $3;`
 
   const values = [
-    this._config.database,
-    this._config.user,
+    this._client.database,
+    this._client.user,
     this._strategy.maxIdleConnectionsToKill
   ]
 
@@ -87,8 +87,8 @@ ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async functio
     LIMIT $4;`
 
   const values = [
-    this._config.user,
-    this._config.database,
+    this._client.user,
+    this._client.database,
     this._strategy.minConnIdleTimeSec,
     this._strategy.maxIdleConnectionsToKill
   ]
@@ -121,7 +121,7 @@ ServerlessClient.prototype._getProcessesCount = async function() {
         WHERE datname = $1
           AND usename = $2;`
 
-    const values = [this._config.database, this._config.user]
+    const values = [this._client.database, this._client.user]
 
     try {
       const result = await this._client.query(query, values);
