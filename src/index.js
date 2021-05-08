@@ -397,15 +397,15 @@ ServerlessClient.prototype.query = async function(...args){
     // We fulfill the promise to catch the error
     return await this._client.query(...args)
   } catch (e) {
-    // If a client has been terminated by serverless-postgres and try to query again
-    // we re-initialize it and retry
-    this._client = null
-
     if (
       e.message === "Client has encountered a connection error and is not queryable" ||
       e.message === "terminating connection due to administrator command" ||
       e.message === "Connection terminated unexpectedly"
     ){
+      // If a client has been terminated by serverless-postgres and try to query again
+      // we re-initialize it and retry
+      this._client = null
+
       if (this._backoff.queryRetries < this._backoff.maxRetries) {
         this._logger("Retry query...attempt: ", this._backoff.queryRetries)
         const totalDelay = this._decorrelatedJitter(this._backoff.delayMs)
