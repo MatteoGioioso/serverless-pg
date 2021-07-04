@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "jest",
+    "test": "docker-compose up --build -d && jest && docker-compose down",
     "semantic-release": "semantic-release"
   },
   "author": "",

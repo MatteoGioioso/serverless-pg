@@ -2,6 +2,14 @@ const ServerlessClient = require("../index");
 
 jest.setTimeout(30000);
 
+const dbConfig = {
+  user: "postgres",
+  host: "localhost",
+  database: "postgres",
+  password: "postgres",
+  port: 22000
+}
+
 const sleep = delay =>
   new Promise(resolve => {
     setTimeout(() => {
@@ -17,7 +25,7 @@ const generateMockConnections = async (n) => {
       host: "localhost",
       database: "postgres",
       password: "postgres",
-      port: 5433
+      port: dbConfig.port
     });
 
     await c.connect();
@@ -41,27 +49,27 @@ const cleanMockConnections = async (clients) => {
  * they will not be run in the CI/CD pipeline but only on pre-commit to make sure nothing is broken.
  * Make sure your PostgreSQL is running and no other clients other than the test user is connected.
  */
-describe("Serverless client", function() {
-  describe("Default strategy minimum_idle_time", function() {
+describe("Serverless client", function () {
+  describe("Default strategy minimum_idle_time", function () {
     let client;
 
-    beforeEach(async function() {
+    beforeEach(async function () {
       client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09
       });
       await client.connect();
     });
 
-    afterEach(async function() {
+    afterEach(async function () {
       await client.end();
     });
 
-    it("should get the list of idles connections", async function() {
+    it("should get the list of idles connections", async function () {
       const mockClients = await generateMockConnections(10);
       await sleep(1000);
       await mockClients[0].query("SELECT 1+1 AS result"); // make a random client not idle
@@ -74,7 +82,7 @@ describe("Serverless client", function() {
       expect(result).toHaveLength(9);
     });
 
-    it("should get the list of idles connections with limit", async function() {
+    it("should get the list of idles connections with limit", async function () {
       client._strategy.maxIdleConnectionsToKill = 5;
       const mockClients = await generateMockConnections(10);
       await sleep(1000);
@@ -85,7 +93,7 @@ describe("Serverless client", function() {
       expect(result).toHaveLength(5);
     });
 
-    it("should get an empty list of idles connections, idle time not passed", async function() {
+    it("should get an empty list of idles connections, idle time not passed", async function () {
       client._strategy.minConnIdleTimeSec = 2;
       const mockClients = await generateMockConnections(10);
       await sleep(1000);
@@ -96,7 +104,7 @@ describe("Serverless client", function() {
       expect(result).toHaveLength(0);
     });
 
-    it("should kill the right number of connections", async function() {
+    it("should kill the right number of connections", async function () {
       const mockClients = await generateMockConnections(10);
       await sleep(1000);
       await mockClients[0].query("SELECT 1+1 AS result"); // make a random client not idle
@@ -107,13 +115,13 @@ describe("Serverless client", function() {
       expect(result).toHaveLength(9);
     });
 
-    it("should set max connections from the db", async function() {
+    it("should set max connections from the db", async function () {
       const client1 = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09,
         debug: false,
         manualMaxConnections: true,
@@ -128,13 +136,13 @@ describe("Serverless client", function() {
       await client1.end();
     });
 
-    it("should cache process count", async function() {
+    it("should cache process count", async function () {
       const client1 = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         processCountCacheEnabled: true,
         processCountFreqMs: 2000,
         debug: true
@@ -170,16 +178,16 @@ describe("Serverless client", function() {
     });
   });
 
-  describe("Ranked strategy", function() {
+  describe("Ranked strategy", function () {
     let client;
 
-    beforeEach(async function() {
+    beforeEach(async function () {
       client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09,
         debug: false,
         strategy: "ranked"
@@ -187,11 +195,11 @@ describe("Serverless client", function() {
       await client.connect();
     });
 
-    afterEach(async function() {
+    afterEach(async function () {
       await client.end();
     });
 
-    it("should get process count without errors", async function() {
+    it("should get process count without errors", async function () {
       const mockClients = await generateMockConnections(4);
       const result = await client._getProcessesCount();
       await cleanMockConnections(mockClients);
@@ -199,7 +207,7 @@ describe("Serverless client", function() {
       expect(result).toBe("5");
     });
 
-    it("should get list of processes count", async function() {
+    it("should get list of processes count", async function () {
       const mockClients = await generateMockConnections(4);
       const result = await client._getIdleProcessesListOrderByDate();
       await cleanMockConnections(mockClients);
@@ -208,14 +216,14 @@ describe("Serverless client", function() {
       expect(result.map(r => r.state)).toEqual(["idle", "idle", "idle", "idle"]);
     });
 
-    it("should clean idle clients", async function() {
+    it("should clean idle clients", async function () {
       await generateMockConnections(10);
       const result = await client.clean();
 
       expect(result).toHaveLength(10);
     });
 
-    it("should not clean idle clients not enough clients connected", async function() {
+    it("should not clean idle clients not enough clients connected", async function () {
       const mockClients = await generateMockConnections(4);
       const result = await client.clean();
       await cleanMockConnections(mockClients);
@@ -224,15 +232,15 @@ describe("Serverless client", function() {
     });
   });
 
-  describe("Client", function() {
-    it("should try to reconnect and fail after 3 attempt", async function() {
+  describe("Client", function () {
+    it("should try to reconnect and fail after 3 attempt", async function () {
       const mockClients = await generateMockConnections(100);
       const client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         debug: true
       });
 
@@ -248,7 +256,7 @@ describe("Serverless client", function() {
       }
     });
 
-    it("should try to reconnect and succeed", async function() {
+    it("should try to reconnect and succeed", async function () {
       const mockClients = await generateMockConnections(100);
 
       // End this client after one second so the connection reattempt can be successful
@@ -261,7 +269,7 @@ describe("Serverless client", function() {
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         debug: true
       });
 
@@ -277,13 +285,13 @@ describe("Serverless client", function() {
     });
 
 
-    it("Should reinitialize a client and query again", async function() {
+    it("Should reinitialize a client and query again", async function () {
       const client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
         password: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09
       });
       await client.connect();
@@ -291,7 +299,7 @@ describe("Serverless client", function() {
       const mockClients = await generateMockConnections(1);
       const pid = mockClients[0]._client.processID;
       // Simulate the process being killed by serverless-postgres
-      await client._killProcesses([{ pid }]);
+      await client._killProcesses([{pid}]);
 
       // Try to query to a client that has been disconnected
       const result = await mockClients[0].query("SELECT 1+1 AS result");
@@ -304,12 +312,12 @@ describe("Serverless client", function() {
       expect(result.rows[0].result).toBe(2);
     });
 
-    it("should set password in the config and connect without errors", async function() {
+    it("should set password in the config and connect without errors", async function () {
       const client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09
       });
       client.setConfig({
@@ -321,9 +329,63 @@ describe("Serverless client", function() {
 
       expect(result.rows[0].result).toBe(2);
     });
+
+    it('should create a new client if new credentials are passed', async function () {
+      const diffCredentialsSpy = jest.spyOn(ServerlessClient.prototype, "_diffCredentials")
+      const client = new ServerlessClient({
+        allowCredentialsDiffing: true
+      });
+
+      expect(diffCredentialsSpy).not.toHaveBeenCalled()
+
+      client.setConfig({
+        user: "postgres",
+        host: "localhost",
+        database: "postgres",
+        password: "postgres",
+        port: dbConfig.port,
+      })
+      await client.connect();
+      await client.clean();
+
+      expect(diffCredentialsSpy).not.toHaveBeenCalled()
+
+      // Switch new credentials
+      client.setConfig({
+        user: "postgres2",
+        host: "localhost",
+        database: "postgres2",
+        password: "postgres2",
+        port: 22001,
+      })
+      await client.connect();
+
+      expect(diffCredentialsSpy).toHaveBeenCalledTimes(1)
+      expect(client._config).toEqual({
+        allowCredentialsDiffing: true,
+        user: "postgres2",
+        host: "localhost",
+        database: "postgres2",
+        password: "postgres2",
+        port: 22001,
+      })
+
+      // Switch again database to the previous one
+      client.setConfig({
+        user: "postgres",
+        host: "localhost",
+        database: "postgres",
+        password: "postgres",
+        port: dbConfig.port,
+      })
+      await client.connect();
+      await client.end();
+
+      expect(diffCredentialsSpy).toHaveBeenCalledTimes(2)
+    });
   });
 
-  describe("Validation", function() {
+  describe("Validation", function () {
     [
       {
         name: "should reject the instantiation an invalid strategy",
@@ -333,7 +395,7 @@ describe("Serverless client", function() {
             host: "localhost",
             database: "postgres",
             password: "postgres",
-            port: 5433,
+            port: dbConfig.port,
             strategy: "invalid_strategy"
           }
         },
@@ -349,7 +411,7 @@ describe("Serverless client", function() {
             host: "localhost",
             database: "postgres",
             password: "postgres",
-            port: 5433,
+            port: dbConfig.port,
             debug: []
           }
         },
@@ -365,7 +427,7 @@ describe("Serverless client", function() {
             host: "localhost",
             database: "postgres",
             password: "postgres",
-            port: 5433,
+            port: dbConfig.port,
             maxIdleConnectionsToKill: "null"
           }
         },
@@ -381,7 +443,7 @@ describe("Serverless client", function() {
             host: "localhost",
             database: "postgres",
             password: "postgres",
-            port: 5433,
+            port: dbConfig.port,
             maxConnsFreqMs: -200
           }
         },
@@ -397,7 +459,7 @@ describe("Serverless client", function() {
             host: "localhost",
             database: "postgres",
             password: "postgres",
-            port: 5433,
+            port: dbConfig.port,
             connUtilization: 1.2
           }
         },
@@ -406,7 +468,7 @@ describe("Serverless client", function() {
         }
       }
     ].forEach(test => {
-      it(test.name, function() {
+      it(test.name, function () {
         try {
           new ServerlessClient(test.args.config);
 
@@ -418,12 +480,12 @@ describe("Serverless client", function() {
       });
     });
 
-    it("should persist the config object even when setConfig is called", async function() {
+    it("should persist the config object even when setConfig is called", async function () {
       const client = new ServerlessClient({
         user: "postgres",
         host: "localhost",
         database: "postgres",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09,
         debug: true,
         maxConnections: 500
@@ -439,13 +501,13 @@ describe("Serverless client", function() {
       expect(client._maxConns.cache.total).toBe(500);
     });
 
-    it("should setConfig correctly and override previous options", async function() {
+    it("should setConfig correctly and override previous options", async function () {
       const client = new ServerlessClient({
         user: "wrong user",
         host: "localhost",
         database: "postgres",
         password: "wrong password",
-        port: 5433,
+        port: dbConfig.port,
         connUtilization: 0.09,
         debug: true,
         maxConnections: 500
@@ -464,35 +526,35 @@ describe("Serverless client", function() {
       expect(client._maxConns.cache.total).toBe(8);
     });
 
-    it("should be able to connect with connection string", async function() {
+    it("should be able to connect with connection string", async function () {
       const client = new ServerlessClient({
-        connectionString: "postgresql://postgres:postgres@localhost:5433/postgres",
+        connectionString: `postgresql://postgres:postgres@localhost:${dbConfig.port}/postgres`,
         debug: true
       });
 
       await client.connect();
 
       expect(client._client.database).toEqual("postgres");
-      expect(client._client.port).toEqual(5433);
+      expect(client._client.port).toEqual(dbConfig.port);
       expect(client._client.user).toEqual("postgres");
 
       await client.end();
     });
 
-    it("should be able to connect with connection string through setConfig", async function() {
+    it("should be able to connect with connection string through setConfig", async function () {
       const client = new ServerlessClient({
         debug: true
       });
 
       client.setConfig({
-        connectionString: "postgresql://postgres:postgres@localhost:5433/postgres",
+        connectionString: `postgresql://postgres:postgres@localhost:${dbConfig.port}/postgres`,
         maxConnections: 10
       });
 
       await client.connect();
 
       expect(client._client.database).toEqual("postgres");
-      expect(client._client.port).toEqual(5433);
+      expect(client._client.port).toEqual(dbConfig.port);
       expect(client._client.user).toEqual("postgres");
 
       await client.end();

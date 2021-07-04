@@ -14,6 +14,7 @@ declare interface Config {
   port?: number;
   host?: string;
   connectionString?: string;
+  allowCredentialsDiffing?: boolean;
   keepAlive?: boolean;
   stream?: stream.Duplex;
   statement_timeout?: false | number;
