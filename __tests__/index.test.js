@@ -560,4 +560,22 @@ describe("Serverless client", function () {
       await client.end();
     });
   });
+
+  describe("Library", function () {
+    it("should allow custom library usage", async function () {
+      const AWSXRay = require("aws-xray-sdk")
+      AWSXRay.setContextMissingStrategy("IGNORE_ERROR");
+      const client = new ServerlessClient({
+        ...dbConfig,
+        debug: true,
+        library: AWSXRay.capturePostgres(require("pg"))
+      });
+
+      await client.connect();
+      const result = await client.query("SELECT 1+1 AS result");
+      await client.end();
+
+      expect(result.rows[0].result).toBe(2);
+    });
+  })
 });

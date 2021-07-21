@@ -8,7 +8,6 @@
  */
 
 const {isValidStrategy, type, validateNum, isWithinRange} = require("./utils");
-const {Client} = require("pg");
 
 function ServerlessClient(config) {
   this._client = null;
@@ -218,7 +217,8 @@ ServerlessClient.prototype._init = async function () {
     this._client.end()
   }
 
-  this._client = new Client(this._config)
+  const PG = this._library || require("pg")
+  this._client = new PG.Client(this._config)
   this._multipleCredentials.areCredentialsDifferent = false
 
   // pg throws an error if we terminate the connection, therefore we need to swallow these errors
@@ -260,7 +260,8 @@ ServerlessClient.prototype._validateConfig = function (config) {
     capMs,
     baseMs,
     delayMs,
-    maxRetries
+    maxRetries,
+    library
   } = config
 
   if (
@@ -381,6 +382,8 @@ ServerlessClient.prototype.setConfig = function (config) {
   if (this._multipleCredentials.allowCredentialsDiffing && this._client !== null) {
     this._diffCredentials(prevConfig, config)
   }
+
+  this._library = this._config.library
 }
 
 ServerlessClient.prototype._logger = function (...args) {
