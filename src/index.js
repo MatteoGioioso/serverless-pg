@@ -217,8 +217,7 @@ ServerlessClient.prototype._init = async function () {
     this._client.end()
   }
 
-  const PG = this._library || require("pg")
-  this._client = new PG.Client(this._config)
+  this._client = new this._library.Client(this._config)
   this._multipleCredentials.areCredentialsDifferent = false
 
   // pg throws an error if we terminate the connection, therefore we need to swallow these errors
@@ -383,7 +382,7 @@ ServerlessClient.prototype.setConfig = function (config) {
     this._diffCredentials(prevConfig, config)
   }
 
-  this._library = this._config.library
+  this._library = this._config.library || require("pg")
 }
 
 ServerlessClient.prototype._logger = function (...args) {

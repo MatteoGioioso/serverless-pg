@@ -110,6 +110,7 @@ const handler = async(event, context) => {
 | processCountCacheEnabled | `Boolean` | Enable caching for get process count. | `False` |
 | processCountFreqMs | `Integer` | The number of milliseconds to cache lookups of process count. | `6000` |
 | allowCredentialsDiffing | `Boolean` | If you are using dynamic credentials, such as IAM, you can set this parameter to `true` and the client will be refreshed | `false` |
+| library | `Function` | Custom postgres library | `require('pg')` |
 
 
 ## Note
