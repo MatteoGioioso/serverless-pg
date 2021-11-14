@@ -26,7 +26,7 @@ declare interface Config {
   idle_in_transaction_session_timeout?: number;
   application_name?: string;
   connectionTimeoutMillis?: number;
-  manualMaxConnections?: number;
+  manualMaxConnections?: boolean;
   maxConnsFreqMs?: number;
   maxConnections?: number;
   processCountFreqMs?: number;
