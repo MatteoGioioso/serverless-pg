@@ -13,11 +13,14 @@
     "pg": "^8.5.1"
   },
   "devDependencies": {
+    "aws-xray-sdk": "^3.3.3",
     "husky": "^4.3.8",
     "jest": "^26.6.3",
     "prettier": "^1.19.1",
-    "semantic-release": "^17.3.9",
-    "aws-xray-sdk": "^3.3.3"
+    "semantic-release": "^19.0.2",
+    "@babel/helper-compilation-targets": "^7.17.7",
+    "@babel/helper-environment-visitor": "^7.16.7",
+    "@babel/helper-hoist-variables": "^7.16.7"
   },
   "typings": "index.d.ts",
   "prettier": {
