@@ -40,7 +40,7 @@ export declare interface Config {
   baseMs?: number;
   delayMs?: number;
   maxRetries?: number;
-  library ?: pg.Client;
+  library?: pg;
 }
 
 declare class ServerlessClient {
