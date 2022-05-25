@@ -3,6 +3,7 @@
   "version": "0.0.0-development",
   "description": "",
   "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "test": "docker-compose up --build -d && jest && docker-compose down",
     "semantic-release": "semantic-release"
@@ -22,7 +23,6 @@
     "@babel/helper-environment-visitor": "^7.16.7",
     "@babel/helper-hoist-variables": "^7.16.7"
   },
-  "typings": "index.d.ts",
   "prettier": {
     "printWidth": 100
   },
