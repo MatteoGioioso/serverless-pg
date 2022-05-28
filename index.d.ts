@@ -1,14 +1,14 @@
 import stream = require('stream');
 import pg = require('pg');
 
-export declare interface TlsOptions {
+declare interface TlsOptions {
   rejectUnauthorized?: boolean;
   ca?: string;
   key?: string;
   cert?: string;
 }
 
-export declare interface Config {
+declare interface Config {
   user?: string;
   database?: string;
   password?: string | (() => string | Promise<string>);
@@ -40,7 +40,11 @@ export declare interface Config {
   baseMs?: number;
   delayMs?: number;
   maxRetries?: number;
-  library ?: pg.Client;
+  library?: pg.Client;
+}
+
+declare namespace ServerlessClient {
+  export { TlsOptions, Config }
 }
 
 declare class ServerlessClient {
@@ -53,4 +57,4 @@ declare class ServerlessClient {
   on(...args): void
 }
 
-export default ServerlessClient
+export = ServerlessClient
