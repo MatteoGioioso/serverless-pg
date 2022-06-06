@@ -1,5 +1,4 @@
 import stream = require('stream');
-import pg = require('pg');
 
 declare interface TlsOptions {
   rejectUnauthorized?: boolean;
@@ -40,7 +39,7 @@ declare interface Config {
   baseMs?: number;
   delayMs?: number;
   maxRetries?: number;
-  library?: pg.Client;
+  library?: typeof import("pg");
 }
 
 declare namespace ServerlessClient {
