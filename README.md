@@ -5,13 +5,13 @@
 ![GitHub](https://img.shields.io/github/license/MatteoGioioso/serverless-pg) \
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/matteogioioso)
 
-
 Serverless-postgres is a wrapper for **[node-pg](https://github.com/brianc/node-postgres)** Node.js module.
 It is heavily inspired by Jeremy Daly's **[serverless-mysql](https://github.com/jeremydaly/serverless-mysql)** package.
 
 ### Why I need this module?
-In a serverless application a function can scale almost "infinitely" by creating separate container instances 
-for each concurrent user. 
+
+In a serverless application a function can scale almost "infinitely" by creating separate container instances
+for each concurrent user.
 Each container can correspond to a database connection which, for performance purposes, is left opened for further
 re-utilization. If we have a sudden spike of concurrent traffic, the available connections can be quickly maxed out
 by other competing functions.
@@ -19,17 +19,32 @@ If we reach the max connections limit, Postgres will automatically reject any fr
 This can cause heavy disruption in your application.
 
 ### What does it do?
+
 Serverless-postgres adds a connection management component specifically for FaaS based applications.
 By calling the method `.clean()` at the end of your functions, the module will constantly monitor the status of all
-the processes running in the PostgreSQL backend and then, based on the configuration provided, 
+the processes running in the PostgreSQL backend and then, based on the configuration provided,
 will garbage collect the "zombie" connections.
 If the client fails to connect with `"sorry, too many clients already"` error, the module will retry
 using trusted backoff algorithms.
 
-> **NOTE:** This module *should* work with any PostgreSQL server. 
-It has been tested with AWS's RDS Postgres, Aurora Postgres, and Aurora Serverless.
+> **NOTE:** This module *should* work with any PostgreSQL server.
+> It has been tested with AWS's RDS Postgres, Aurora Postgres, and Aurora Serverless.
 
 Feel free to request additional features and contribute =)
+
+## Changelog
+
+- **Default connections filtering (>= v2)**: this feature leverage postgres `application_name` to differentiate
+  clients created by this library and others, this will avoid terminating connections belonging to long-running
+  process, batch jobs, ect...
+  By default, we set the same `application_name` parameter for all the serverless clients, if you wish you can change it
+  by just specifying it in the client config:
+  ```javascript
+  const client = new ServerlessClient({
+    ...
+    application_name: 'my_client',
+  });
+  ```
 
 ## Install
 
@@ -45,23 +60,23 @@ Declare the ServerlessClient outside the lambda handler
 const ServerlessClient = require('serverless-postgres')
 
 const client = new ServerlessClient({
-    user: process.env.DB_USER,
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    port: process.env.DB_PORT,
-    debug: true,
-    delayMs: 3000,
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT,
+  debug: true,
+  delayMs: 3000,
 });
 
-const handler = async(event, context) => {
-    await client.connect();
-    const result = await client.query(`SELECT 1+1 AS result`);
-    await client.clean();
-    return {
-      body: JSON.stringify({message: result.rows[0]}),
-      statusCode: 200
-    }
+const handler = async (event, context) => {
+  await client.connect();
+  const result = await client.query(`SELECT 1+1 AS result`);
+  await client.clean();
+  return {
+    body: JSON.stringify({ message: result.rows[0] }),
+    statusCode: 200
+  }
 }
 
 ```
@@ -72,23 +87,21 @@ You can set the configuration dynamically if your secret is stored in a vault
 const ServerlessClient = require('serverless-postgres')
 
 const client = new ServerlessClient({
-    host: process.env.DB_HOST,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT,
 });
 
-const handler = async(event, context) => {
-    const {user, password} = await getCredentials('my-secret')
-    client.setConfig({
-      user, password
-    })
-    await client.connect();
-    // ...rest of the code
+const handler = async (event, context) => {
+  const { user, password } = await getCredentials('my-secret')
+  client.setConfig({
+    user, password
+  })
+  await client.connect();
+  // ...rest of the code
 }
 
 ```
-
-
 
 ## Configuration Options
 
@@ -112,9 +125,8 @@ const handler = async(event, context) => {
 | allowCredentialsDiffing | `Boolean` | If you are using dynamic credentials, such as IAM, you can set this parameter to `true` and the client will be refreshed | `false` |
 | library | `Function` | Custom postgres library | `require('pg')` |
 
-
 ## Note
 
-- `Serverless-postgres` depends on `pg` package and usually you **do not need to install it on your own**. 
+- `Serverless-postgres` depends on `pg` package and usually you **do not need to install it on your own**.
   As some users have observed, if you have installed it on your own, and it is a different version,
   this package might misbehave.
