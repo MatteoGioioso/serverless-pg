@@ -1,4 +1,5 @@
 const ServerlessClient = require("../index");
+const AWSXRay = require("aws-xray-sdk");
 
 jest.setTimeout(30000);
 
@@ -368,6 +369,7 @@ describe("Serverless client", function () {
         database: "postgres2",
         password: "postgres2",
         port: 22001,
+        application_name: 'serverless_client'
       })
 
       // Switch again database to the previous one
