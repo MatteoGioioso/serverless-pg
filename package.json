@@ -14,14 +14,15 @@
     "pg": "^8.5.1"
   },
   "devDependencies": {
+    "@babel/helper-compilation-targets": "^7.17.7",
+    "@babel/helper-environment-visitor": "^7.16.7",
+    "@babel/helper-hoist-variables": "^7.16.7",
     "aws-xray-sdk": "^3.3.3",
     "husky": "^4.3.8",
     "jest": "^26.6.3",
     "prettier": "^1.19.1",
     "semantic-release": "^19.0.2",
-    "@babel/helper-compilation-targets": "^7.17.7",
-    "@babel/helper-environment-visitor": "^7.16.7",
-    "@babel/helper-hoist-variables": "^7.16.7"
+    "pg-query-stream": "^4.2.3"
   },
   "prettier": {
     "printWidth": 100

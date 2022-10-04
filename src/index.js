@@ -3,7 +3,6 @@
  * This module wrap node-postgres package, more detail regarding it can be found here:
  * https://github.com/brianc/node-postgres
  * @author Matteo Gioioso <matteo@hirvitek.com>
- * @version 1.3.0
  * @license MIT
  */
 
@@ -46,13 +45,15 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function () 
       WHERE datname = $1
         AND state = 'idle'
         AND usename = $2
+        AND application_name = $4
       ORDER BY state_change
       LIMIT $3;`
 
   const values = [
     this._client.database,
     this._client.user,
-    this._strategy.maxIdleConnectionsToKill
+    this._strategy.maxIdleConnectionsToKill,
+    this._application_name
   ]
 
   try {
@@ -78,6 +79,7 @@ ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async functio
           WHERE usename = $1
             AND datname = $2
             AND state = 'idle'
+            AND application_name = $5
       )
       SELECT pid
       FROM processes
@@ -88,7 +90,8 @@ ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async functio
     this._client.user,
     this._client.database,
     this._strategy.minConnIdleTimeSec,
-    this._strategy.maxIdleConnectionsToKill
+    this._strategy.maxIdleConnectionsToKill,
+    this._application_name
   ]
 
   try {
@@ -117,9 +120,10 @@ ServerlessClient.prototype._getProcessesCount = async function () {
         SELECT COUNT(pid)
         FROM pg_stat_activity
         WHERE datname = $1
-          AND usename = $2;`
+          AND usename = $2
+          AND application_name = $3;`
 
-    const values = [this._client.database, this._client.user]
+    const values = [this._client.database, this._client.user, this._application_name]
 
     try {
       const result = await this._client.query(query, values);
@@ -147,14 +151,15 @@ ServerlessClient.prototype._killProcesses = async function (processesList) {
       SELECT pg_terminate_backend(pid)
       FROM pg_stat_activity
       WHERE pid = ANY ($1)
-        AND state = 'idle';`
+        AND state = 'idle'
+        AND application_name = $2;`
 
-  const values = [pids]
+  const values = [pids, this._application_name]
 
   try {
     return await this._client.query(query, values)
   } catch (e) {
-    this._logger("Swallowed internal error", e.message)
+    this._logger("Swallowed internal error: ", e.message)
     // Swallow the error, if this produce an error there is no need to error the function
 
     return {
@@ -376,6 +381,9 @@ ServerlessClient.prototype.setConfig = function (config) {
     retries: 0,
     queryRetries: 0
   }
+
+  this._application_name = this._config.application_name || "serverless_client"
+  this._config.application_name = this._application_name
 
   // Prevent diffing also if client is null
   if (this._multipleCredentials.allowCredentialsDiffing && this._client !== null) {
