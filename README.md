@@ -32,20 +32,6 @@ using trusted backoff algorithms.
 
 Feel free to request additional features and contribute =)
 
-## Changelog
-
-- **Default connections filtering (>= v2)**: this feature leverage postgres `application_name` to differentiate
-  clients created by this library and others, this will avoid terminating connections belonging to long-running
-  process, batch jobs, ect...
-  By default, we set the same `application_name` parameter for all the serverless clients, if you wish you can change it
-  by just specifying it in the client config:
-  ```javascript
-  const client = new ServerlessClient({
-    ...
-    application_name: 'my_client',
-  });
-  ```
-
 ## Install
 
 ```bash
@@ -103,27 +89,91 @@ const handler = async (event, context) => {
 
 ```
 
+## Connections filtering (>= v2)
+
+This feature leverage postgres `application_name` to differentiate
+clients created by this library and others, this will avoid terminating connections belonging to long-running
+processes, batch jobs, ect...
+By default, we set the same `application_name` parameter for all the serverless clients, if you wish you can change it
+by just specifying it in the client config:
+
+```javascript
+const client = new ServerlessClient({
+  application_name: 'my_client',
+});
+```
+
+## Plugins (>= v2)
+
+Serverless-postgres is extensible and could be used for any wire compatible postgres engines such as Redshift, Google
+Cloud Spanner, CockroachDB, YugabyteDB, etc...
+If needed you can write your own plugin implementing the following interface:
+
+```typescript
+interface Plugin {
+  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): string | string[] []
+
+  getIdleProcessesListOrderByDate(self: ServerlessClient): string | string[] []
+
+  processCount(self: ServerlessClient): string | string[] []
+
+  killProcesses(self: ServerlessClient, pids: string[]): string | string[] []
+
+  showMaxConnections(self: ServerlessClient): string | string[] []
+}
+
+```
+
+Every function supply as argument the serverless client itself so you can access any configuration parameter such
+as `database`, `user`, `applicationName`, `ect...`;
+you will need to return an array of values which is the query and the array of parameters, ex:
+
+```javascript
+killProcesses(serverlessPgSelf, pids) {
+  const query = `
+      SELECT pg_terminate_backend(pid)
+      FROM pg_stat_activity
+      WHERE pid = ANY ($1)
+        AND state = 'idle'
+        AND application_name = $2;`
+
+  const values = [pids, serverlessPgSelf._application_name]
+
+  return [query, values]
+}
+```
+
+You can then use your plugin like this:
+
+```javascript
+ const client = new ServerlessClient({
+  plugin: new MyServerlessPGPlugin(someObject)
+});
+```
+
 ## Configuration Options
 
-| Property | Type | Description | Default |
-| -------- | ---- | ----------- | ------- |
-| config | `Object` | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client) | `{}` |
-| maxConnsFreqMs | `Integer` | The number of milliseconds to cache lookups of max_connections. | `60000` |
-| manualMaxConnections | `Boolean` | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself | `false` |
-| maxConnections | `Integer` | Max connections of your PostgreSQL. I highly suggest to set this yourself | `100` |
-| strategy | `String` | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked` | `minimum_idle_time` |
-| minConnectionIdleTimeSec | `Integer` | The minimum number of seconds that a connection must be idle before the module will recycle it. | `0.5` |
-| maxIdleConnectionsToKill | `Integer` or `null` | The amount of max connection that will get killed. Default is `ALL` | `null` |
-| connUtilization | `Number` | The percentage of total connections to use when connecting to your PostgreSQL server. A value of `0.80` would use 80% of your total available connections. | `0.8` |
-| debug | `Boolean` | Enable/disable debugging logs. | `false` |
-| capMs | `Integer` | Maximum number of milliseconds between connection retries. | `1000` |
-| baseMs | `Integer` | Number of milliseconds added to random backoff values. | `2` |
-| delayMs | `Integer` | Additional delay to add to the exponential backoff. | `1000` |
-| maxRetries | `Integer` | Maximum number of times to retry a connection before throwing an error. | `3` |
-| processCountCacheEnabled | `Boolean` | Enable caching for get process count. | `False` |
-| processCountFreqMs | `Integer` | The number of milliseconds to cache lookups of process count. | `6000` |
-| allowCredentialsDiffing | `Boolean` | If you are using dynamic credentials, such as IAM, you can set this parameter to `true` and the client will be refreshed | `false` |
-| library | `Function` | Custom postgres library | `require('pg')` |
+| Property                 | Type                | Description                                                                                                                                                | Default             | Version |
+|--------------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------|
+| config                   | `Object`            | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client)                                                                   | `{}`                |         |
+| maxConnsFreqMs           | `Integer`           | The number of milliseconds to cache lookups of max_connections.                                                                                            | `60000`             |         |
+| manualMaxConnections     | `Boolean`           | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself     | `false`             |         |
+| maxConnections           | `Integer`           | Max connections of your PostgreSQL. I highly suggest to set this yourself                                                                                  | `100`               |         |
+| strategy                 | `String`            | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked`                                          | `minimum_idle_time` |         |
+| minConnectionIdleTimeSec | `Integer`           | The minimum number of seconds that a connection must be idle before the module will recycle it.                                                            | `0.5`               |         |
+| maxIdleConnectionsToKill | `Integer` or `null` | The amount of max connection that will get killed. Default is `ALL`                                                                                        | `null`              |         |
+| connUtilization          | `Number`            | The percentage of total connections to use when connecting to your PostgreSQL server. A value of `0.80` would use 80% of your total available connections. | `0.8`               |         |
+| debug                    | `Boolean`           | Enable/disable debugging logs.                                                                                                                             | `false`             |         |
+| capMs                    | `Integer`           | Maximum number of milliseconds between connection retries.                                                                                                 | `1000`              |         |
+| baseMs                   | `Integer`           | Number of milliseconds added to random backoff values.                                                                                                     | `2`                 |         |
+| delayMs                  | `Integer`           | Additional delay to add to the exponential backoff.                                                                                                        | `1000`              |         |
+| maxRetries               | `Integer`           | Maximum number of times to retry a connection before throwing an error.                                                                                    | `3`                 |         |
+| processCountCacheEnabled | `Boolean`           | Enable caching for get process count.                                                                                                                      | `False`             |         |
+| processCountFreqMs       | `Integer`           | The number of milliseconds to cache lookups of process count.                                                                                              | `6000`              |         |
+| allowCredentialsDiffing  | `Boolean`           | If you are using dynamic credentials, such as IAM, you can set this parameter to `true` and the client will be refreshed                                   | `false`             |         |
+| library                  | `Function`          | Custom postgres library                                                                                                                                    | `require('pg')`     |         |
+| application_name         | `String`            | This is postgres specific configuration; serverless-pg uses it to avoid closing other applications connections.                                            | `serverless_client` | `>= v2` |
+| plugin                   | `Object`            | This is where you need to initialize your plugin class                                                                                                     | `Postgres`          | `>= v2` |
 
 ## Note
 

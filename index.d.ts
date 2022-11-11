@@ -40,7 +40,18 @@ declare interface Config {
   delayMs?: number;
   maxRetries?: number;
   library?: typeof import("pg");
+  plugin?: Plugin;
 }
+
+declare interface Plugin {
+  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): PluginReturnValue
+  getIdleProcessesListOrderByDate(self: ServerlessClient): PluginReturnValue
+  processCount(self: ServerlessClient): PluginReturnValue
+  killProcesses(self: ServerlessClient, pids: string[]): PluginReturnValue
+  showMaxConnections(self: ServerlessClient): PluginReturnValue
+}
+
+declare type PluginReturnValue = string | string[] []
 
 declare namespace ServerlessClient {
   export { TlsOptions, Config }

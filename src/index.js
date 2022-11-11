@@ -7,9 +7,16 @@
  */
 
 const {isValidStrategy, type, validateNum, isWithinRange} = require("./utils");
+const Postgres = require("./postgres");
 
 function ServerlessClient(config) {
   this._client = null;
+  if (config.plugin) {
+    this._plugin = config.plugin
+  } else {
+    this._plugin = new Postgres()
+  }
+
   this.setConfig(config)
 }
 
@@ -24,7 +31,7 @@ ServerlessClient.prototype._sleep = delay =>
 ServerlessClient.prototype._setMaxConnections = async (__self) => {
   // If cache is expired
   if (Date.now() - __self._maxConns.cache.updated > __self._maxConns.freqMs) {
-    const results = await __self._client.query(`SHOW max_connections`)
+    const results = await __self._client.query(...__self._plugin.showMaxConnections(this))
     const maxConnections = results.rows[0].max_connections
 
     __self._logger("Getting max connections from database...", maxConnections)
@@ -39,25 +46,8 @@ ServerlessClient.prototype._setMaxConnections = async (__self) => {
 // This strategy arbitrarily (maxIdleConnections) terminates connections starting from the oldest one in idle.
 // It is very aggressive and it can cause disruption if a connection was in idle for a short period of time
 ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function () {
-  const query = `
-      SELECT pid, backend_start, state
-      FROM pg_stat_activity
-      WHERE datname = $1
-        AND state = 'idle'
-        AND usename = $2
-        AND application_name = $4
-      ORDER BY state_change
-      LIMIT $3;`
-
-  const values = [
-    this._client.database,
-    this._client.user,
-    this._strategy.maxIdleConnectionsToKill,
-    this._application_name
-  ]
-
   try {
-    const result = await this._client.query(query, values);
+    const result = await this._client.query(...this._plugin.getIdleProcessesListOrderByDate(this));
 
     return result.rows
   } catch (e) {
@@ -71,31 +61,8 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function () 
 // than a minimum amount of seconds, it is very accurate as it only takes the process that have been in idle
 // for more than a threshold time (minConnectionTimeoutSec)
 ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async function () {
-  const query = `
-      WITH processes AS (
-          SELECT EXTRACT(EPOCH FROM (Now() - state_change)) AS idle_time,
-                 pid
-          FROM pg_stat_activity
-          WHERE usename = $1
-            AND datname = $2
-            AND state = 'idle'
-            AND application_name = $5
-      )
-      SELECT pid
-      FROM processes
-      WHERE idle_time > $3
-      LIMIT $4;`
-
-  const values = [
-    this._client.user,
-    this._client.database,
-    this._strategy.minConnIdleTimeSec,
-    this._strategy.maxIdleConnectionsToKill,
-    this._application_name
-  ]
-
   try {
-    const result = await this._client.query(query, values)
+    const result = await this._client.query(...this._plugin.getIdleProcessesListByMinimumTimeout(this))
 
     return result.rows
   } catch (e) {
@@ -116,17 +83,8 @@ ServerlessClient.prototype._getProcessesCount = async function () {
   }
 
   if (isCacheExpiredOrDisabled(this)) {
-    const query = `
-        SELECT COUNT(pid)
-        FROM pg_stat_activity
-        WHERE datname = $1
-          AND usename = $2
-          AND application_name = $3;`
-
-    const values = [this._client.database, this._client.user, this._application_name]
-
     try {
-      const result = await this._client.query(query, values);
+      const result = await this._client.query(...this._plugin.processCount(this));
       this._processCount.cache = {
         count: result.rows[0].count || 0,
         updated: Date.now()
@@ -147,17 +105,8 @@ ServerlessClient.prototype._getProcessesCount = async function () {
 ServerlessClient.prototype._killProcesses = async function (processesList) {
   const pids = processesList.map(proc => proc.pid);
 
-  const query = `
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE pid = ANY ($1)
-        AND state = 'idle'
-        AND application_name = $2;`
-
-  const values = [pids, this._application_name]
-
   try {
-    return await this._client.query(query, values)
+    return await this._client.query(...this._plugin.killProcesses(this, pids))
   } catch (e) {
     this._logger("Swallowed internal error: ", e.message)
     // Swallow the error, if this produce an error there is no need to error the function
