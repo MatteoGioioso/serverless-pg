@@ -111,35 +111,29 @@ If needed you can write your own plugin implementing the following interface:
 
 ```typescript
 interface Plugin {
-  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): string | string[] []
+  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): Promise<NodePgClientResponse<ProcessList>>;
 
-  getIdleProcessesListOrderByDate(self: ServerlessClient): string | string[] []
+  getIdleProcessesListOrderByDate(self: ServerlessClient): Promise<NodePgClientResponse<ProcessList>>;
 
-  processCount(self: ServerlessClient): string | string[] []
+  processCount(self: ServerlessClient): Promise<NodePgClientResponse<Count>>;
 
-  killProcesses(self: ServerlessClient, pids: string[]): string | string[] []
+  killProcesses(self: ServerlessClient, pids: string[]): Promise<NodePgClientResponse<any>>;
 
-  showMaxConnections(self: ServerlessClient): string | string[] []
+  showMaxConnections(self: ServerlessClient): Promise<NodePgClientResponse<MaxConnections>>;
 }
 
 ```
 
 Every function supply as argument the serverless client itself so you can access any configuration parameter such
 as `database`, `user`, `applicationName`, `ect...`;
-you will need to return an array of values which is the query and the array of parameters, ex:
+if your changes are minimal you can inherit the main Postgres plugin class:
 
 ```javascript
-killProcesses(serverlessPgSelf, pids) {
-  const query = `
-      SELECT pg_terminate_backend(pid)
-      FROM pg_stat_activity
-      WHERE pid = ANY ($1)
-        AND state = 'idle'
-        AND application_name = $2;`
-
-  const values = [pids, serverlessPgSelf._application_name]
-
-  return [query, values]
+class MyPlugin extends Postgres {
+  constructor() {
+    super();
+  }
+  // ...
 }
 ```
 
@@ -158,7 +152,7 @@ You can then use your plugin like this:
 | config                   | `Object`            | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client)                                                                   | `{}`                |         |
 | maxConnsFreqMs           | `Integer`           | The number of milliseconds to cache lookups of max_connections.                                                                                            | `60000`             |         |
 | manualMaxConnections     | `Boolean`           | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself     | `false`             |         |
-| maxConnections           | `Integer`           | Max connections of your PostgreSQL. I highly suggest to set this yourself                                                                                  | `100`               |         |
+| maxConnections           | `Integer`           | Max connections of your PostgreSQL, it should be set equal to `max_connections` in your cluster. I highly suggest to set this yourself                     | `100`               |         |
 | strategy                 | `String`            | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked`                                          | `minimum_idle_time` |         |
 | minConnectionIdleTimeSec | `Integer`           | The minimum number of seconds that a connection must be idle before the module will recycle it.                                                            | `0.5`               |         |
 | maxIdleConnectionsToKill | `Integer` or `null` | The amount of max connection that will get killed. Default is `ALL`                                                                                        | `null`              |         |

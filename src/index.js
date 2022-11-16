@@ -31,7 +31,7 @@ ServerlessClient.prototype._sleep = delay =>
 ServerlessClient.prototype._setMaxConnections = async (__self) => {
   // If cache is expired
   if (Date.now() - __self._maxConns.cache.updated > __self._maxConns.freqMs) {
-    const results = await __self._client.query(...__self._plugin.showMaxConnections(this))
+    const results = await __self._plugin.showMaxConnections(__self)
     const maxConnections = results.rows[0].max_connections
 
     __self._logger("Getting max connections from database...", maxConnections)
@@ -47,7 +47,7 @@ ServerlessClient.prototype._setMaxConnections = async (__self) => {
 // It is very aggressive and it can cause disruption if a connection was in idle for a short period of time
 ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function () {
   try {
-    const result = await this._client.query(...this._plugin.getIdleProcessesListOrderByDate(this));
+    const result = await this._plugin.getIdleProcessesListOrderByDate(this);
 
     return result.rows
   } catch (e) {
@@ -62,7 +62,7 @@ ServerlessClient.prototype._getIdleProcessesListOrderByDate = async function () 
 // for more than a threshold time (minConnectionTimeoutSec)
 ServerlessClient.prototype._getIdleProcessesListByMinimumTimeout = async function () {
   try {
-    const result = await this._client.query(...this._plugin.getIdleProcessesListByMinimumTimeout(this))
+    const result = await this._plugin.getIdleProcessesListByMinimumTimeout(this)
 
     return result.rows
   } catch (e) {
@@ -84,7 +84,7 @@ ServerlessClient.prototype._getProcessesCount = async function () {
 
   if (isCacheExpiredOrDisabled(this)) {
     try {
-      const result = await this._client.query(...this._plugin.processCount(this));
+      const result = await this._plugin.processCount(this);
       this._processCount.cache = {
         count: result.rows[0].count || 0,
         updated: Date.now()
@@ -94,6 +94,7 @@ ServerlessClient.prototype._getProcessesCount = async function () {
     } catch (e) {
       this._logger("Swallowed internal error", e.message)
       // Swallow the error, if this produce an error there is no need to error the function
+      // TODO: maybe return the cached process count would be better
       return 0
     }
   }
@@ -106,7 +107,7 @@ ServerlessClient.prototype._killProcesses = async function (processesList) {
   const pids = processesList.map(proc => proc.pid);
 
   try {
-    return await this._client.query(...this._plugin.killProcesses(this, pids))
+    return await this._plugin.killProcesses(this, pids)
   } catch (e) {
     this._logger("Swallowed internal error: ", e.message)
     // Swallow the error, if this produce an error there is no need to error the function
@@ -144,6 +145,8 @@ ServerlessClient.prototype.clean = async function () {
     const processesList = await strategy();
     if (processesList.length) {
       const killedProcesses = await this._killProcesses(processesList);
+      // This to minimize the chances of re-triggering the killProcesses if the lambda is called after few seconds
+      this._processCount.cache.count = this._processCount.cache.count - killedProcesses.rows.length
       this._logger("+++++ Killed processes: ", killedProcesses.rows.length, " +++++")
       return killedProcesses.rows
     }

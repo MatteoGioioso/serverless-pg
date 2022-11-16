@@ -1,4 +1,4 @@
-import stream = require('stream');
+import stream = require("stream");
 
 declare interface TlsOptions {
   rejectUnauthorized?: boolean;
@@ -44,26 +44,50 @@ declare interface Config {
 }
 
 declare interface Plugin {
-  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): PluginReturnValue
-  getIdleProcessesListOrderByDate(self: ServerlessClient): PluginReturnValue
-  processCount(self: ServerlessClient): PluginReturnValue
-  killProcesses(self: ServerlessClient, pids: string[]): PluginReturnValue
-  showMaxConnections(self: ServerlessClient): PluginReturnValue
+  getIdleProcessesListByMinimumTimeout(self: ServerlessClient): Promise<NodePgClientResponse<ProcessList>>;
+
+  getIdleProcessesListOrderByDate(self: ServerlessClient): Promise<NodePgClientResponse<ProcessList>>;
+
+  processCount(self: ServerlessClient): Promise<NodePgClientResponse<Count>>;
+
+  killProcesses(self: ServerlessClient, pids: string[]): Promise<NodePgClientResponse<any>>;
+
+  showMaxConnections(self: ServerlessClient): Promise<NodePgClientResponse<MaxConnections>>;
 }
 
-declare type PluginReturnValue = string | string[] []
+declare interface ProcessList {
+  pid: string;
+}
+
+declare interface Count {
+  count: number;
+}
+
+declare interface MaxConnections {
+  max_connections: number;
+}
+
+declare interface NodePgClientResponse<T> {
+  rows: T[];
+}
 
 declare namespace ServerlessClient {
-  export { TlsOptions, Config }
+  export { TlsOptions, Config };
 }
 
 declare class ServerlessClient {
   constructor(config: Config)
+
   clean(): Promise<number | undefined>
+
   setConfig(config: Config): void
+
   connect(): Promise<void>
+
   query(...args): Promise<any>
+
   end(): Promise<any>
+
   on(...args): void
 }
 
