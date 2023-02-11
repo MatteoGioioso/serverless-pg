@@ -20,9 +20,9 @@
     "aws-xray-sdk": "^3.3.3",
     "husky": "^4.3.8",
     "jest": "^26.6.3",
+    "pg-query-stream": "^4.2.3",
     "prettier": "^1.19.1",
-    "semantic-release": "^19.0.2",
-    "pg-query-stream": "^4.2.3"
+    "semantic-release": "^19.0.2"
   },
   "prettier": {
     "printWidth": 100
