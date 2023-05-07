@@ -85,6 +85,7 @@ ServerlessClient.prototype._getProcessesCount = async function () {
   if (isCacheExpiredOrDisabled(this)) {
     try {
       const result = await this._plugin.processCount(this);
+
       this._processCount.cache = {
         count: result.rows[0].count || 0,
         updated: Date.now()

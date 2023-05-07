@@ -29,14 +29,14 @@ class Postgres {
 
   async getIdleProcessesListOrderByDate(serverlessPgSelf) {
     const query = `
-        SELECT pid, backend_start, state
-        FROM pg_stat_activity
-        WHERE datname = $1
-          AND state = 'idle'
-          AND usename = $2
-          AND application_name = $4
-        ORDER BY state_change
-            LIMIT $3;`;
+      SELECT pid, backend_start, state
+      FROM pg_stat_activity
+      WHERE datname = $1
+        AND state = 'idle'
+        AND usename = $2
+        AND application_name = $4
+      ORDER BY state_change
+      LIMIT $3;`
 
     const values = [
       serverlessPgSelf._client.database,
@@ -48,7 +48,7 @@ class Postgres {
     return serverlessPgSelf._client.query(query, values);
   }
 
-  async processCount(serverlessPgSelf) {
+  async processCount(serverlessPgSelf){
     const query = `
         SELECT COUNT(pid)
         FROM pg_stat_activity
