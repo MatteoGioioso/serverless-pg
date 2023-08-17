@@ -12,6 +12,8 @@
 
 ---
 
+## What is serverless-pg?
+
 Serverless-postgres is a wrapper for **[node-pg](https://github.com/brianc/node-postgres)** Node.js module.
 It is heavily inspired by Jeremy Daly's **[serverless-mysql](https://github.com/jeremydaly/serverless-mysql)** package.
 
