@@ -7,7 +7,7 @@
 
 ---
 
-#### Slow query? Check [Pgex, PostgreSQL query explainer](https://www.pgex.matteogioioso.com/)
+### Slow query? Check [Pgex, PostgreSQL query explainer](https://www.pgex.matteogioioso.com/)
 [![Slow Query? Use postgres explain](./docs/postgres-explain.png)](https://www.pgex.matteogioioso.com/)
 
 ---
