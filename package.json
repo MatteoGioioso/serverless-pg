@@ -12,12 +12,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "pg": "^8.11.5"
+    "pg": "^8.15.6"
   },
   "devDependencies": {
     "@babel/helper-compilation-targets": "^7.23.6",
     "@babel/helper-environment-visitor": "^7.22.20",
     "@babel/helper-hoist-variables": "^7.22.5",
+    "@types/pg": "^8.15.0",
     "aws-xray-sdk": "^3.6.0",
     "husky": "^4.3.8",
     "jest": "^26.6.3",
