@@ -39,7 +39,7 @@ declare interface Config {
   baseMs?: number;
   delayMs?: number;
   maxRetries?: number;
-  library?: typeof import("pg");
+  library?: typeof import("pg").default;
   plugin?: Plugin;
 }
 
