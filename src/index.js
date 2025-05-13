@@ -6,10 +6,13 @@
  * @license MIT
  */
 
+const EventEmitter = require("events");
 const {isValidStrategy, type, validateNum, isWithinRange} = require("./utils");
 const Postgres = require("./postgres");
 
 function ServerlessClient(config) {
+  EventEmitter.call(this);
+
   this._client = null;
   if (config.plugin) {
     this._plugin = config.plugin
@@ -19,6 +22,9 @@ function ServerlessClient(config) {
 
   this.setConfig(config)
 }
+
+ServerlessClient.prototype = Object.create(EventEmitter.prototype);
+ServerlessClient.prototype.constructor = ServerlessClient;
 
 ServerlessClient.prototype.constructor = ServerlessClient;
 ServerlessClient.prototype._sleep = delay =>
@@ -201,6 +207,7 @@ ServerlessClient.prototype._init = async function () {
     await this._setMaxConnections(this)
   }
 
+  this.emit("init", this._client);
   this._logger("Max connections: ", this._maxConns.cache.total)
 }
 
@@ -421,10 +428,6 @@ ServerlessClient.prototype.end = async function () {
   this._backoff.queryRetries = 0
   await this._client.end()
   this._client = null
-}
-
-ServerlessClient.prototype.on = function (...args) {
-  this._client.on(...args)
 }
 
 module.exports = {ServerlessClient};

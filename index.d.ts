@@ -1,4 +1,6 @@
+import EventEmitter = require("events");
 import stream = require("stream");
+import pg = require("pg");
 
 declare interface TlsOptions {
   rejectUnauthorized?: boolean;
@@ -75,7 +77,7 @@ declare namespace ServerlessClient {
   export { TlsOptions, Config };
 }
 
-declare class ServerlessClient {
+declare class ServerlessClient extends EventEmitter {
   constructor(config: Config)
 
   clean(): Promise<number | undefined>
@@ -88,7 +90,7 @@ declare class ServerlessClient {
 
   end(): Promise<any>
 
-  on(...args): void
+  on(event: "init", listener: (client: pg.Client) => void): this
 }
 
 export = ServerlessClient
