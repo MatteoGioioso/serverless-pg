@@ -44,7 +44,7 @@ Feel free to request additional features and contribute =)
 ## Install
 
 ```bash
-npm i serverless-postgres
+npm i serverless-postgres pg
 ```
 
 ## Usage
@@ -159,7 +159,7 @@ You can then use your plugin like this:
 | Property                 | Type                | Description                                                                                                                                                | Default             | Version |
 |--------------------------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|---------|
 | config                   | `Object`            | A `node-pg` configuration object as defined [here](https://node-postgres.com/api/client)                                                                   | `{}`                |         |
-| maxConnsFreqMs           | `Integer`           | The number of milliseconds to cache lookups of max_connections.                                                                                            | `60000`             |         |
+| maxConnsFreqMs           | `Integer`           | The number of milliseconds to cache lookups of max\_connections.                                                                                            | `60000`             |         |
 | manualMaxConnections     | `Boolean`           | if this parameters is set to true it will query to get the maxConnections values, to maximize performance you should set the `maxConnections` yourself     | `false`             |         |
 | maxConnections           | `Integer`           | Max connections of your PostgreSQL, it should be set equal to `max_connections` in your cluster. I highly suggest to set this yourself                     | `100`               |         |
 | strategy                 | `String`            | Name of your chosen strategy for cleaning up "zombie" connections, allowed values `minimum_idle_time` or `ranked`                                          | `minimum_idle_time` |         |
@@ -175,11 +175,5 @@ You can then use your plugin like this:
 | processCountFreqMs       | `Integer`           | The number of milliseconds to cache lookups of process count.                                                                                              | `6000`              |         |
 | allowCredentialsDiffing  | `Boolean`           | If you are using dynamic credentials, such as IAM, you can set this parameter to `true` and the client will be refreshed                                   | `false`             |         |
 | library                  | `Function`          | Custom postgres library                                                                                                                                    | `require('pg')`     |         |
-| application_name         | `String`            | This is postgres specific configuration; serverless-pg uses it to avoid closing other applications connections.                                            | `serverless_client` | `>= v2` |
+| application\_name         | `String`            | This is postgres specific configuration; serverless-pg uses it to avoid closing other applications connections.                                            | `serverless_client` | `>= v2` |
 | plugin                   | `Object`            | This is where you need to initialize your plugin class                                                                                                     | `Postgres`          | `>= v2` |
-
-## Note
-
-- `Serverless-postgres` depends on `pg` package and usually you **do not need to install it on your own**.
-  As some users have observed, if you have installed it on your own, and it is a different version,
-  this package might misbehave.
